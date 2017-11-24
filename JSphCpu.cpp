@@ -748,6 +748,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   (unsigned n,unsigned pinit,tint4 nc,int hdiv,unsigned cellinitial
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
   ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
+	,float *press
   ,float &viscdt,float *ar)const            // ^  changed to float for the global velocity     SHABA
 {
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
@@ -762,17 +763,19 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 	//cout << pfin-pinit << endl;
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0;
-		//if(idp[p1] == 17)
-		//cout << idp[p1] <<" the central particle " << TimeStep << endl; //output the id of the central particle to the screen
+		
 		// SHABA
 		float ting1=0;
-		float ting2x=0, ting2y=0, ting2z=0;
-		float adamix=0, adamiy=0, adamiz=0;
+		float ting2x=0, ting2y=0, ting2z=0, ting2press=0;
+		float adamix=0, adamiy=0, adamiz=0, adamipress=0;
 		
 		//-Load position data of particle p1 / Carga datos de particula p1.                   SHABA
     const tfloat3 psposp1=(psimple? pspos[p1]: TFloat3(0));
     const tdouble3 posp1=(psimple? TDouble3(0): pos[p1]);
 
+		if(idp[p1] == 39)
+		cout << idp[p1] <<" the central particle " << pos[p1].x << TimeStep << endl; //output the id of the central particle to the screen
+		
 		//-Obtain limits of interaction / Obtiene limites de interaccion   SHABA Moved this from original position
     int cxini,cxfin,yini,yfin,zini,zfin;
     GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
@@ -785,7 +788,6 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
         const unsigned pini=beginendcell[cxini+ymod];
         const unsigned pfin=beginendcell[cxfin+ymod];
 
-				
 
 				// SHABA - hopefully this with do the sums for the shepard filter used in Adami particles
 				//----------------------------------------------
@@ -799,14 +801,25 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
             float frx,fry,frz=0;
             float fac=0;
 						fac = GetKernelWab(rr2,drx,dry,drz,frx,fry,frz);
-						//if(idp[p1] == 17)
-						//cout << idp[p2] << "             " << fac << endl; // output particle 2 id to the screen
-
-						ting1+=fac;
-						ting2x+=velrhop[p2].x*fac;
-						ting2y+=velrhop[p2].y*fac;
-						ting2z+=velrhop[p2].z*fac;
-            
+						if(idp[p1] == 39){
+							cout << fac <<endl;
+							cout << idp[p2] << "             " << fac << endl; // output particle 2 id to the screen
+							cout << "particle loop" << endl;
+						}
+						if(fac==0){
+							ting2x+=0;
+							ting2y+=0;
+							ting2z+=0;
+							ting2press+=0;
+						}
+						else{
+							ting1+=fac;
+							ting2x+=velrhop[p2].x*fac;
+							ting2y+=velrhop[p2].y*fac;
+							ting2z+=velrhop[p2].z*fac;
+							ting2press+=press[p2]*fac;
+						}
+						
 					}
 				}
 			}
@@ -815,6 +828,20 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 		adamix+=ting2x/ting1;
 		adamiy+=ting2y/ting1;
 		adamiz+=ting2z/ting1;
+		adamipress+=ting2press/ting1;
+
+		if(ting1==0){
+							adamix=0;
+							adamiy=0;
+							adamiz=0;
+							adamipress=0;
+						}
+
+		/*if(idp[p1] == 41){
+						
+						cout << adamix << "\t" << adamiy << "\t" << adamiz << "\t" << adamipress << "\t" << endl;
+						cout << " adami velocities and pressures" << endl;
+		}*/
 
 		//-Load velocity data of particle p1 / Carga datos de particula p1.                   SHABA
     const tfloat3 velp1=TFloat3(velrhop[p1].x-adamix,velrhop[p1].y-adamiy,velrhop[p1].z-adamiz);
@@ -853,7 +880,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
             if(tker==KERNEL_Wendland)GetKernel(rr2,drx,dry,drz,frx,fry,frz);
             else if(tker==KERNEL_Cubic)GetKernelCubic(rr2,drx,dry,drz,frx,fry,frz);
 
-						//if(idp[p1] == 17)
+					//	if(idp[p1] == 18)
 						//cout << idp[p2] << "             " << " original loop " <<endl; // output particle 2 id to the screen
 
             //===== Get mass of particle p2  /  Obtiene masa de particula p2 ===== 
@@ -879,6 +906,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
           }
         }
       }
+
     }
    /* //-Sum results together / Almacena resultados.
     if(arp1||visc){
@@ -892,10 +920,11 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 
 		//cout << idp[p1] << "\t" << velrhop[p1].x << "  "<< velrhop[p1].y << "  "<< velrhop[p1].z << "  prev" << endl;
 
-		velrhop[p1].x += velp1.x, velrhop[p1].y += velp1.y, velrhop[p1].z += velp1.z;
-
-		//cout << idp[p1] << "\t" << velrhop[p1].x << "  "<< velrhop[p1].y << "  "<< velrhop[p1].z << "  new" << endl;
-
+		velrhop[p1].x = -adamix, velrhop[p1].y = -adamiy, velrhop[p1].z = adamiz, press[p1] = adamipress;
+		
+		/*if(idp[p1]==41)
+		cout << idp[p1] << "\t" << velrhop[p1].x << "  "<< velrhop[p1].y << "  "<< velrhop[p1].z << "   " << press[p1] << "  new" << endl;
+		*/
 	}
 }
 
@@ -914,13 +943,13 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 {
   const bool boundp2=(!cellinitial); //-Interaction with type boundary (Bound) /  Interaccion con Bound.
   //-Initialize viscth to calculate viscdt maximo con OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
-  float viscth[MAXTHREADS_OMP*STRIDE_OMP];
-  for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
+  //float viscth[MAXTHREADS_OMP*STRIDE_OMP];
+  //for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
   //-Initial execution with OpenMP / Inicia ejecucion con OpenMP.
   const int pfin=int(pinit+n);
-  #ifdef _WITHOMP
+ /* #ifdef _WITHOMP
     #pragma omp parallel for schedule (guided)
-  #endif
+  #endif*/
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0,deltap1=0;
     tfloat3 acep1=TFloat3(0);
@@ -928,6 +957,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
     tfloat3 shiftposp1=TFloat3(0);
     float shiftdetectp1=0;
 
+		
     //-Obtain data of particle p1 in case of floating objects / Obtiene datos de particula p1 en caso de existir floatings.
     bool ftp1=false;     //-Indicate if it is floating / Indica si es floating.
     float ftmassp1=1.f;  //-Contains floating particle mass or 1.0f if it is fluid / Contiene masa de particula floating o 1.0f si es fluid.
@@ -971,6 +1001,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
             if(tker==KERNEL_Wendland)GetKernel(rr2,drx,dry,drz,frx,fry,frz);
             else if(tker==KERNEL_Cubic)GetKernelCubic(rr2,drx,dry,drz,frx,fry,frz);
 
+						
             //===== Get mass of particle p2  /  Obtiene masa de particula p2 ===== 
             float massp2=(boundp2? MassBound: MassFluid); //-Contiene masa de particula segun sea bound o fluid.
             bool ftp2=false;    //-Indicate if it is floating / Indica si es floating.
@@ -1069,8 +1100,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
       if(tdelta==DELTA_DynamicExt)delta[p1]=(delta[p1]==FLT_MAX || deltap1==FLT_MAX? FLT_MAX: delta[p1]+deltap1);
       ar[p1]+=arp1;
       ace[p1]=ace[p1]+acep1;
-      const int th=omp_get_thread_num();
-      if(visc>viscth[th*STRIDE_OMP])viscth[th*STRIDE_OMP]=visc;
+     // const int th=omp_get_thread_num();
+      //if(visc>viscth[th*STRIDE_OMP])viscth[th*STRIDE_OMP]=visc;
       if(lamsps){
         gradvel[p1].xx+=gradvelp1.xx;
         gradvel[p1].xy+=gradvelp1.xy;
@@ -1086,7 +1117,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
     }
   }
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
-  for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
+  //for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
 }
 
 //==============================================================================
@@ -1237,7 +1268,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   (unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
   ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
-  ,const float *press
+  ,float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1251,7 +1282,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 	if(npbok){ //SHABA moved the boundary interaction to happen before the fluid interaction
     //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
 		
-    InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,viscdt,ar);
+    InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar);
   }
   if(npf){
     //-Interaction Fluid-Fluid / Interaccion Fluid-Fluid
@@ -1275,7 +1306,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
   ,const tdouble3 *pos, tfloat4 *velrhop,const unsigned *idp,const word *code
-  ,const float *press
+  ,float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1428,7 +1459,7 @@ void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
 void JSphCpu::InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
   ,const tfloat3 *pspos, tfloat4 *velrhop,const unsigned *idp,const word *code
-  ,const float *press
+  ,float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1695,7 +1726,7 @@ void JSphCpu::ComputeVelrhopBound(const tfloat4* velrhopold,double armul,tfloat4
   #endif
   for(int p=0;p<npb;p++){
     const float rhopnew=float(double(velrhopold[p].w)+armul*Arc[p]);
-    velrhopnew[p]=TFloat4(velrhopold[p].x,velrhopold[p].y,velrhopold[p].z,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorved by boundary ones / Evita q las boundary absorvan a las fluidas.
+    velrhopnew[p]=TFloat4(0,0,0,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorved by boundary ones / Evita q las boundary absorvan a las fluidas.
   }
 }
 
@@ -1814,7 +1845,7 @@ template<bool shift> void JSphCpu::ComputeSymplecticCorrT(double dt){
   for(int p=0;p<npb;p++){
     const double epsilon_rdot=(-double(Arc[p])/double(Velrhopc[p].w))*dt;
     const float rhopnew=float(double(VelrhopPrec[p].w) * (2.-epsilon_rdot)/(2.+epsilon_rdot));
-    Velrhopc[p]=TFloat4(0,0,0,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorbed by boundary ones / Evita q las boundary absorvan a las fluidas.
+    Velrhopc[p]=TFloat4(VelrhopPrec[p].x,VelrhopPrec[p].y,VelrhopPrec[p].z,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorbed by boundary ones / Evita q las boundary absorvan a las fluidas.
   }
 
   //-Calculate fluid values / Calcula datos de fluido.

@@ -172,6 +172,7 @@ protected:
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellinitial
     ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
     ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhopp,const word *code,const unsigned *id
+		,float *press
     ,float &viscdt,float *ar)const; //          ^ changed from const to float SHABA
 
   template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void InteractionForcesFluid
@@ -194,7 +195,7 @@ protected:
     (unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
     ,const tdouble3 *pos,const tfloat3 *pspos, tfloat4 *velrhop,const word *code,const unsigned *idp
-    ,const float *press
+    ,float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
     ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const;
@@ -202,7 +203,7 @@ protected:
   void Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
     ,const tdouble3 *pos, tfloat4 *velrhop,const unsigned *idp,const word *code
-    ,const float *press
+    ,float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
     ,tfloat3 *shiftpos,float *shiftdetect)const;
@@ -210,7 +211,7 @@ protected:
   void InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
     ,const tfloat3 *pspos, tfloat4 *velrhop,const unsigned *idp,const word *code
-    ,const float *press
+    ,float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
     ,tfloat3 *shiftpos,float *shiftdetect)const;
