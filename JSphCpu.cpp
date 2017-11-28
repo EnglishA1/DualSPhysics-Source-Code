@@ -773,8 +773,10 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
     const tfloat3 psposp1=(psimple? pspos[p1]: TFloat3(0));
     const tdouble3 posp1=(psimple? TDouble3(0): pos[p1]);
 
-		if(idp[p1] == 39)
+		/*if(idp[p1] == 39){
 		cout << idp[p1] <<" the central particle " << pos[p1].x << TimeStep << endl; //output the id of the central particle to the screen
+
+		cout << Awen << endl;}*/
 		
 		//-Obtain limits of interaction / Obtiene limites de interaccion   SHABA Moved this from original position
     int cxini,cxfin,yini,yfin,zini,zfin;
@@ -801,11 +803,11 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
             float frx,fry,frz=0;
             float fac=0;
 						fac = GetKernelWab(rr2,drx,dry,drz,frx,fry,frz);
-						if(idp[p1] == 39){
+						/*if(idp[p1] == 39){
 							cout << fac <<endl;
 							cout << idp[p2] << "             " << fac << endl; // output particle 2 id to the screen
 							cout << "particle loop" << endl;
-						}
+						}*/
 						if(fac==0){
 							ting2x+=0;
 							ting2y+=0;
@@ -950,6 +952,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
  /* #ifdef _WITHOMP
     #pragma omp parallel for schedule (guided)
   #endif*/
+	float wend=0;
+	
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0,deltap1=0;
     tfloat3 acep1=TFloat3(0);
@@ -957,6 +961,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
     tfloat3 shiftposp1=TFloat3(0);
     float shiftdetectp1=0;
 
+		wend=0;
+		
 		
     //-Obtain data of particle p1 in case of floating objects / Obtiene datos de particula p1 en caso de existir floatings.
     bool ftp1=false;     //-Indicate if it is floating / Indica si es floating.
@@ -1001,6 +1007,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
             if(tker==KERNEL_Wendland)GetKernel(rr2,drx,dry,drz,frx,fry,frz);
             else if(tker==KERNEL_Cubic)GetKernelCubic(rr2,drx,dry,drz,frx,fry,frz);
 
+						float fac = GetKernelWab(rr2,drx,dry,drz,frx,fry,frz);
+
+						
 						
             //===== Get mass of particle p2  /  Obtiene masa de particula p2 ===== 
             float massp2=(boundp2? MassBound: MassFluid); //-Contiene masa de particula segun sea bound o fluid.
@@ -1017,6 +1026,11 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
               if(ftp2 && shift && tshifting==SHIFT_NoBound)shiftposp1.x=FLT_MAX; //-With floating objects do not use shifting / Con floatings anula shifting.
               compute=!(USE_DEM && ftp1 && (boundp2 || ftp2)); //-Deactivate when using DEM and if it is of type float-float or float-bound / Se desactiva cuando se usa DEM y es float-float o float-bound.
             }
+
+						wend+=fac*massp2/velrhop[p2].w;
+
+						//if(idp[p1]==250)
+						//	cout << idp[p2] << "\t" << fac << "\t" << wend<< endl;
 
             //===== Acceleration ===== 
             if(compute){
@@ -1115,7 +1129,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
         if(shiftdetect)shiftdetect[p1]+=shiftdetectp1;
       }
     }
+		
   }
+	
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
   //for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
 }
