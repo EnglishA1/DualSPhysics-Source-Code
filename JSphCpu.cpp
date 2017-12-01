@@ -29,6 +29,7 @@
 #include "JSaveDt.h"
 #include "JTimeOut.h"
 #include "JSphAccInput.h"
+#include "JSphCpuSingle.h"
 
 #include <climits>
 
@@ -709,7 +710,8 @@ float JSphCpu::GetKernelCubicTensil(float rr2,float rhopp1,float pressp1,float r
 /// Return values of kernel Wendland: frx, fry and frz.                                                                                SHABA
 //==============================================================================
 float JSphCpu::GetKernelWab(float rr2,float drx,float dry,float drz,float &frx,float &fry,float &frz)const{
-  const float rad=sqrt(rr2);
+  const float rr=drx*drx+dry*dry+drz*drz;
+	const float rad=sqrt(rr);
   const float qq=rad/H;
   //-Wendland kernel
   const float wqq1=1.f-0.5f*qq;
@@ -762,6 +764,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 
 	//cout << pfin-pinit << endl;
   for(int p1=int(pinit);p1<pfin;p1++){
+		cout << idp[p1]<< endl;
+		bool perp1 = (CODE_GetType(code[p1])==CODE_NORMAL);
+		
     float visc=0,arp1=0;
 		
 		// SHABA
@@ -781,7 +786,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 		//-Obtain limits of interaction / Obtiene limites de interaccion   SHABA Moved this from original position
     int cxini,cxfin,yini,yfin,zini,zfin;
     GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
-
+		if(perp1){
 		//-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
     for(int z=zini;z<zfin;z++){
       const int zmod=(nc.w)*z+cellinitial; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
@@ -844,10 +849,10 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 						cout << adamix << "\t" << adamiy << "\t" << adamiz << "\t" << adamipress << "\t" << endl;
 						cout << " adami velocities and pressures" << endl;
 		}*/
-
+		}
 		//-Load velocity data of particle p1 / Carga datos de particula p1.                   SHABA
     const tfloat3 velp1=TFloat3(velrhop[p1].x-adamix,velrhop[p1].y-adamiy,velrhop[p1].z-adamiz);
-    
+		
 		
 		/*
 
@@ -921,8 +926,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];*/    // comment out the OpenMP stuff    SHABA
 
 		//cout << idp[p1] << "\t" << velrhop[p1].x << "  "<< velrhop[p1].y << "  "<< velrhop[p1].z << "  prev" << endl;
-
-		velrhop[p1].x = -adamix, velrhop[p1].y = -adamiy, velrhop[p1].z = adamiz, press[p1] = adamipress;
+		if(perp1)
+			velrhop[p1].x = -adamix, velrhop[p1].y = -adamiy, velrhop[p1].z = adamiz, press[p1] = adamipress;
 		
 		/*if(idp[p1]==41)
 		cout << idp[p1] << "\t" << velrhop[p1].x << "  "<< velrhop[p1].y << "  "<< velrhop[p1].z << "   " << press[p1] << "  new" << endl;
@@ -1030,7 +1035,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 						wend+=fac*massp2/velrhop[p2].w;
 
 						//if(idp[p1]==250)
-						//	cout << idp[p2] << "\t" << fac << "\t" << wend<< endl;
+							//cout << idp[p2] << "\t" << fac << "\t" << pos[p2].x << "\t" << pos[p2].z << "\t" << drx <<"\t" << drz << "\t" << wend<< endl;
 
             //===== Acceleration ===== 
             if(compute){
@@ -1300,6 +1305,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 		
     InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar);
   }
+	
   if(npf){
     //-Interaction Fluid-Fluid / Interaccion Fluid-Fluid
     InteractionForcesFluid<psimple,tker,ftmode,lamsps,tdelta,shift> (npf,npb,nc,hdiv,cellfluid,Visco                 ,begincell,cellzero,dcell,spstau,spsgradvel,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,tshifting,shiftpos,shiftdetect);

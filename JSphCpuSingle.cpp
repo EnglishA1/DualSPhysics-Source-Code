@@ -223,7 +223,7 @@ unsigned JSphCpuSingle::PeriodicMakeList(unsigned n,unsigned pini,bool stable,un
     count=listp[nmax];
     //-Reorder list if it is valid and stability is activated / Reordena lista si es valida y stable esta activado.
     if(stable && count && count<=nmax){
-      //-Don't make mistaje because at the moment the list is not created using OpenMP / No hace falta porque de momento no se crea la lista usando OpenMP.
+      //-Don't make mistake because at the moment the list is not created using OpenMP / No hace falta porque de momento no se crea la lista usando OpenMP.
     }
   }
   return(count);
@@ -499,8 +499,15 @@ void JSphCpuSingle::Interaction_Forces(TpInter tinter){
   PreInteraction_Forces(tinter);
   TmcStart(Timers,TMC_CfForces);
 
+	// SHABA Sort out the boundary particles then run periodic again before the fluid interactions
+	/*float viscdt=0;
+  if(Psimple)JSphCpu::InteractionSimple_Forces(Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellc,PsPosc,Velrhopc,Idpc,Codec,Pressc,viscdt,Arc,Acec,Deltac,SpsTauc,SpsGradvelc,ShiftPosc,ShiftDetectc);
+  else JSphCpu::Interaction_Forces(Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellc,Posc,Velrhopc,Idpc,Codec,Pressc,viscdt,Arc,Acec,Deltac,SpsTauc,SpsGradvelc,ShiftPosc,ShiftDetectc);
+	
+	RunCellDivide(true);*/
+
   //-Interaction of Fluid-Fluid/Bound & Bound-Fluid (forces and DEM) / Interaccion Fluid-Fluid/Bound & Bound-Fluid (forces and DEM).
-  float viscdt=0;
+  float viscdt=0;        //  SHABA
   if(Psimple)JSphCpu::InteractionSimple_Forces(Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellc,PsPosc,Velrhopc,Idpc,Codec,Pressc,viscdt,Arc,Acec,Deltac,SpsTauc,SpsGradvelc,ShiftPosc,ShiftDetectc);
   else JSphCpu::Interaction_Forces(Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellc,Posc,Velrhopc,Idpc,Codec,Pressc,viscdt,Arc,Acec,Deltac,SpsTauc,SpsGradvelc,ShiftPosc,ShiftDetectc);
 
