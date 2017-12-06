@@ -764,29 +764,31 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 
 	//cout << pfin-pinit << endl;
   for(int p1=int(pinit);p1<pfin;p1++){
-		cout << idp[p1]<< endl;
-		bool perp1 = (CODE_GetType(code[p1])==CODE_NORMAL);
+	//	cout << idp[p1]<< endl;
+		
 		
     float visc=0,arp1=0;
 		
 		// SHABA
 		float ting1=0;
 		float ting2x=0, ting2y=0, ting2z=0, ting2press=0;
+		float ting2dx=0, ting2dy=0, ting2dz=0;
 		float adamix=0, adamiy=0, adamiz=0, adamipress=0;
+		bool marker=false;
 		
 		//-Load position data of particle p1 / Carga datos de particula p1.                   SHABA
     const tfloat3 psposp1=(psimple? pspos[p1]: TFloat3(0));
     const tdouble3 posp1=(psimple? TDouble3(0): pos[p1]);
 
-		/*if(idp[p1] == 39){
+		/*if(idp[p1] == 2){
 		cout << idp[p1] <<" the central particle " << pos[p1].x << TimeStep << endl; //output the id of the central particle to the screen
-
-		cout << Awen << endl;}*/
-		
+		cout << velrhop[p1].x<< "\t"<<velrhop[p1].y<< "\t"<<velrhop[p1].x<< "\t"<<endl;
+		}
+		*/
 		//-Obtain limits of interaction / Obtiene limites de interaccion   SHABA Moved this from original position
     int cxini,cxfin,yini,yfin,zini,zfin;
     GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
-		if(perp1){
+		
 		//-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
     for(int z=zini;z<zfin;z++){
       const int zmod=(nc.w)*z+cellinitial; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
@@ -808,24 +810,44 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
             float frx,fry,frz=0;
             float fac=0;
 						fac = GetKernelWab(rr2,drx,dry,drz,frx,fry,frz);
-						/*if(idp[p1] == 39){
+						/*if(idp[p1] == 3){
 							cout << fac <<endl;
 							cout << idp[p2] << "             " << fac << endl; // output particle 2 id to the screen
 							cout << "particle loop" << endl;
+
+							cout << Gravity.x << "\t" << Gravity.y << "\t" << Gravity.z << endl;
 						}*/
 						if(fac==0){
 							ting2x+=0;
 							ting2y+=0;
 							ting2z+=0;
+
 							ting2press+=0;
+
+							ting2dx+=0;
+							ting2dy+=0;
+							ting2dz+=0;
 						}
 						else{
 							ting1+=fac;
 							ting2x+=velrhop[p2].x*fac;
 							ting2y+=velrhop[p2].y*fac;
 							ting2z+=velrhop[p2].z*fac;
+
 							ting2press+=press[p2]*fac;
+
+							ting2dx+=velrhop[p2].w*drx*fac;
+							ting2dy+=velrhop[p2].w*dry*fac;
+							ting2dz+=velrhop[p2].w*drz*fac;
+
+							marker=true;
 						}
+
+						/*if(idp[p1] == 2105){
+						cout << fac << "\t" << fac/fac<< endl;
+						//cout << adamix << "\t" << adamiy << "\t" << adamiz << "\t" << adamipress << "\t" << endl;
+						//cout << " adami velocities and pressures" << endl;
+		}*/
 						
 					}
 				}
@@ -835,7 +857,10 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 		adamix+=ting2x/ting1;
 		adamiy+=ting2y/ting1;
 		adamiz+=ting2z/ting1;
-		adamipress+=ting2press/ting1;
+
+		adamipress+=(ting2press+Gravity.x*ting2dx+Gravity.y*ting2dy+Gravity.z*ting2dz)/ting1;
+
+
 
 		if(ting1==0){
 							adamix=0;
@@ -844,14 +869,21 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 							adamipress=0;
 						}
 
-		/*if(idp[p1] == 41){
-						
-						cout << adamix << "\t" << adamiy << "\t" << adamiz << "\t" << adamipress << "\t" << endl;
-						cout << " adami velocities and pressures" << endl;
+		/*if(idp[p1] == 2105){
+						cout << fac << "\t" << fac/fac<< endl;
+						//cout << adamix << "\t" << adamiy << "\t" << adamiz << "\t" << adamipress << "\t" << endl;
+						//cout << " adami velocities and pressures" << endl;
 		}*/
-		}
+		
 		//-Load velocity data of particle p1 / Carga datos de particula p1.                   SHABA
-    const tfloat3 velp1=TFloat3(velrhop[p1].x-adamix,velrhop[p1].y-adamiy,velrhop[p1].z-adamiz);
+   tfloat3 velp1=TFloat3(velrhop[p1].x,velrhop[p1].y,velrhop[p1].z);
+		
+		
+		velp1=TFloat3(velrhop[p1].x-adamix,velrhop[p1].y-adamiy,velrhop[p1].z-adamiz);
+		float ting3=adamipress/CteB;
+		velrhop[p1].w=RhopZero*pow((ting3+1),1/Gamma);
+		
+	
 		
 		
 		/*
@@ -926,7 +958,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];*/    // comment out the OpenMP stuff    SHABA
 
 		//cout << idp[p1] << "\t" << velrhop[p1].x << "  "<< velrhop[p1].y << "  "<< velrhop[p1].z << "  prev" << endl;
-		if(perp1)
+		
 			velrhop[p1].x = -adamix, velrhop[p1].y = -adamiy, velrhop[p1].z = adamiz, press[p1] = adamipress;
 		
 		/*if(idp[p1]==41)
@@ -1110,7 +1142,11 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
               }
             }
           }
-        }
+					bool bound=true;
+					bound=(CODE_GetType(code[p2])==CODE_TYPE_FLUID);
+					if(!bound)
+						velrhop[p1].z=0; // Hopefully zero velocity normal to the boundary near the boundary
+        }// particle 2 loop closes here
       }
     }
     //-Sum results together / Almacena resultados.
@@ -1135,7 +1171,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
       }
     }
 		
-  }
+  }// particle 1 loop closes here
 	
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
   //for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
@@ -1748,7 +1784,7 @@ void JSphCpu::ComputeVelrhopBound(const tfloat4* velrhopold,double armul,tfloat4
   #endif
   for(int p=0;p<npb;p++){
     const float rhopnew=float(double(velrhopold[p].w)+armul*Arc[p]);
-    velrhopnew[p]=TFloat4(0,0,0,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorved by boundary ones / Evita q las boundary absorvan a las fluidas.
+    velrhopnew[p]=TFloat4(velrhopold[p].x,velrhopold[p].y,velrhopold[p].z,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorved by boundary ones / Evita q las boundary absorvan a las fluidas.
   }
 }
 
