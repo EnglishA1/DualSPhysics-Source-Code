@@ -726,6 +726,332 @@ void JSphCpu::GetInteractionCells(unsigned rcell
 }
 
 //==============================================================================
+//              MARRONE BOUNDARY PARTICLE CALCULATIONS
+//                              SHABA
+//==============================================================================
+
+//==============================================================================                    SHABA
+// function to find the nearest fluid particle to a boundary particle and therfore 
+// find the normal to the boundary.
+// Function looks the surrounding fluid particles to a boundary particle and
+// calculates the distance between them. The idp of the nearest particle is stored
+// and returned.
+//==============================================================================
+unsigned JSphCpu::FluidHunter(unsigned p1, tdouble3 *pos, unsigned *idp)const
+{
+	// get the location of the boundary particle
+	tdouble3 boundary=pos[p1];
+
+	//cout << idp[pcopy] << "\t" << pos[pcopy].x << "\t" << pos[pcopy].y << "\t" << pos[pcopy].z << endl;
+
+	const unsigned npb0=Npb;
+  const unsigned np0=Np-NpbPer-NpfPer;
+
+	unsigned fluid=0;
+	double distance=10;
+	for(unsigned p2=npb0;p2<np0;p2++){
+		double dx=pos[p2].x-boundary.x;
+		double dy=pos[p2].y-boundary.y;
+		double dz=pos[p2].z-boundary.z;
+
+		double radius=sqrt(dx*dx + dy*dy + dz*dz);
+		if(radius<=distance){
+			distance=radius;
+			fluid = idp[p2];
+			//cout << fluid << "\t" << distance << endl;
+			
+		}
+	}
+
+	return fluid;
+}
+
+//==============================================================================                    SHABA
+// function to find the nearest fluid particle to a boundary particle and therfore 
+// find the normal to the boundary.
+// Function looks the surrounding fluid particles to a boundary particle and
+// calculates the distance between them. The idp of the nearest particle is stored
+// and returned.
+//==============================================================================
+unsigned JSphCpu::BoundaryHunter(unsigned Fluid, tdouble3 *pos, unsigned *idp)const
+{
+	// get the location of the boundary particle
+	tdouble3 fluid=pos[Fluid];
+
+	//cout << idp[pcopy] << "\t" << pos[pcopy].x << "\t" << pos[pcopy].y << "\t" << pos[pcopy].z << endl;
+
+	const unsigned npb0=Npb;
+  
+	unsigned boundary=0;
+	double distance=10;
+	for(unsigned p2=0;p2<npb0;p2++){
+		double dx=pos[p2].x-fluid.x;
+		double dy=pos[p2].y-fluid.y;
+		double dz=pos[p2].z-fluid.z;
+
+		double radius=sqrt(dx*dx + dy*dy + dz*dz);
+		if(radius<=distance){
+			distance=radius;
+			boundary = idp[p2];
+			//cout << fluid << "\t" << distance << endl;
+			
+		}
+	}
+
+	return boundary;
+}
+
+//==============================================================================                      SHABA
+// function to find the distance between a given boundary particle and the nearest
+// fluid particle in each of the three ditections x, y and z. This distance can
+// then be used to position Marrone Probe particles.
+//==============================================================================
+void JSphCpu::DistBound(unsigned p1, tdouble3 *pos, unsigned *idp, float &dx, float &dy, float &dz)const
+{
+
+	// get the location of the boundary particle
+	tdouble3 bound=pos[p1];
+
+	bool xflag=false, yflag=false, zflag=false;
+
+	// get idp of the nearest fluid particle
+	unsigned fluid = FluidHunter(p1, pos, idp);
+	unsigned boundary=BoundaryHunter(fluid, pos, idp);
+	tdouble3 boundary3=pos[boundary];
+
+	float xdist=boundary3.x-bound.x;
+	float ydist=boundary3.y-bound.y;
+	float zdist=boundary3.z-bound.z;
+
+	dx=sqrt(xdist*xdist);
+	dy=sqrt(ydist*ydist);
+	dz=sqrt(zdist*zdist);
+
+	if(dx-Dp<Dp) xflag=true;
+	if(dy-Dp<Dp) yflag=true;
+	if(dz-Dp<Dp) zflag=true;
+
+	if(xflag) dx=0;
+	if(yflag) dy=0;
+	if(zflag) dz=0;
+
+}
+
+//=================================================================================                     SHABA
+// Function to find the normal componants to a boundary for the placement of Marrone
+// Boundary Particles. The normal found is the normal pointing into the fluid from the 
+// the boundary. Using this normal Marrone probe particles can be placed along this 
+// normal along with the correct distance from the physical boundary.
+//=================================================================================
+void JSphCpu::NormalHunter(unsigned p1, tdouble3 *pos, unsigned *idp, float &nx, float &ny, float &nz)const
+{
+	// get the location of the boundary particle
+	tdouble3 bound=pos[pcopy];
+
+	// get idp of the nearest fluid particle
+	unsigned fluid = FluidHunter(p1, pos, idp);
+	unsigned boundary=BoundaryHunter(fluid, pos, idp);
+	tdouble3 boundary3=pos[boundary];
+
+	double xd=boundary3.x-bound.x;
+	double yd=boundary3.y-bound.y;
+	double zd=boundary3.z-bound.z;
+
+	nx=SignHunter(xd);
+	ny=SignHunter(yd);
+	nz=SignHunter(zd);
+}
+
+//==============================================================================                        SHABA
+// Function to find the sign of a number. If the number is positive the function 
+// returns 1, if it is negative the function returns -1. If the number is zero the 
+// function returns 1.
+//==============================================================================
+float JSphCpu::SignHunter(float number)const
+{
+	float norm=0;
+	float zero=0;
+	if(number>zero){
+		norm=1;}
+	if(number<zero){
+		norm=-1;}
+	
+	return norm;
+}
+
+//==============================================================================
+/// Duplicate the indicated particle position applying displacement.
+/// Duplicated particles are considered to be always valid and are inside
+/// of the domain.
+/// This kernel works for single-cpu & multi-cpu because the computations are done  
+/// starting from domposmin.
+/// It is controlled that the coordinates of the cell do not exceed the maximum.
+//==============================================================================
+void JSphCpu::MarroneDuplicatePos(unsigned p1,tdouble3 *pos,  unsigned *idp, tdouble3 &posMar)const{
+  //-Get pos of particle to be duplicated / Obtiene pos de particula a duplicar.
+  posMar=pos[p1];
+  //-Find displacement and direction
+	float dx, dy, dz, nx, ny, nz;
+	DistBound(p1, pos, idp, dx, dy, dz);
+	NormalHunter(p1, pos, idp, nx, ny, nz);
+	//-Apply displacement / Aplica desplazamiento.
+  posMar.x+=2*nx*dx;
+  posMar.y+=2*ny*dy;
+  posMar.z+=2*nz*dz;
+}
+
+//==============================================================================              SHABA
+// Creates the matrix Elements for the MLS kernel used in the Marrone boundary 
+// particle method 
+//==============================================================================
+void JSphCpu::MarroneMatrixElements(float xij, float yij, float zij, unsigned Marr, unsigned p2,  tfloat4 *velrhop,
+	float &a11, float &a12, float &a13, float &a14, float &a22, float &a23, float &a24, float &a33, float &a34, float &a44
+	)const
+{
+  // Load the Marrone probe particle data
+	
+	tfloat4 MarrVelRhop=velrhop[Marr];
+
+	float massp2=MassFluid;
+	
+	 	a11+= (massp2/velrhop[p2].w)*GetKernelWab(xij, yij, zij);
+		a12-= (massp2/velrhop[p2].w)*xij*GetKernelWab(xij, yij, zij);
+		a13-= (massp2/velrhop[p2].w)*yij*GetKernelWab(xij, yij, zij);
+		a14-= (massp2/velrhop[p2].w)*zij*GetKernelWab(xij, yij, zij);
+
+		a22+= (massp2/velrhop[p2].w)*xij*xij*GetKernelWab(xij, yij, zij);
+		a23+= (massp2/velrhop[p2].w)*xij*yij*GetKernelWab(xij, yij, zij);
+		a24+= (massp2/velrhop[p2].w)*xij*zij*GetKernelWab(xij, yij, zij);
+
+		a33+= (massp2/velrhop[p2].w)*yij*yij*GetKernelWab(xij, yij, zij);
+		a34+= (massp2/velrhop[p2].w)*yij*zij*GetKernelWab(xij, yij, zij);
+
+		a44+= (massp2/velrhop[p2].w)*zij*zij*GetKernelWab(xij, yij, zij);
+
+}
+
+//==============================================================================
+// Finds the Determinant of the 4x4 martix used for the MLS Kernel method in the                 SHABA
+// Marrone Boundary Particle method
+//==============================================================================
+float JSphCpu::MLSDet(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44)const
+{
+	float Determinant=0;
+
+	float det1=0, det2=0, det3=0, det4=0;
+
+	det1 = a22*a33*a44 + a23*a34*a24 + a24*a23*a34 - a22*a34*a34 - a23*a23*a44 - a24*a33*a24;
+	det2 = a12*a34*a34 + a23*a13*a44 + a24*a33*a14 - a12*a33*a44 - a23*a34*a14 - a24*a13*a34;
+	det3 = a12*a23*a44 + a22*a34*a14 + a24*a13*a24 - a12*a34*a24 - a22*a13*a44 - a24*a23*a14;
+	det4 = a12*a33*a24 + a22*a13*a34 + a23*a23*a14 - a12*a23*a34 - a22*a33*a14 - a23*a13*a24;
+
+	Determinant = a11*det1 + a12*det2 + det3*a13 + det4*a14;
+
+	return Determinant;
+}
+
+//==============================================================================
+// Generates the multipliers of the position differances in the MLS kernel to be                SHABA
+// used in the Marrone boundary particle method
+//==============================================================================
+void JSphCpu::MLSElements(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44, float &b11, float &b21, float &b31, float &b41)const
+{
+	float det = MLSDet(a11, a12, a13, a14, a22, a23, a24, a33, a34, a44);
+
+	b11 = (1/det)*(a22*(a33*a44 - a34*a34) + a13*(a34*a24 - a23*a44) + a24*(a23*a34 - a33*a24));
+	b21 = (1/det)*(a12*(a34*a34 - a33*a44) + a13*(a23*a44 - a34*a24) + a14*(a33*a24 - a23*a34));
+	b31 = (1/det)*(a12*(a23*a44 - a24*a34) + a13*(a24*a24 - a22*a44) + a14*(a22*a34 - a23*a24));
+	b41 = (1/det)*(a12*(a24*a33 - a23*a34) + a13*(a22*a34 - a24*a23) + a14*(a23*a23 - a22*a33));
+
+}
+
+//==============================================================================
+// Calculates the velocity and pressure at the Marrone probe particles to be fed
+// back into the boundary particles at a later time
+//==============================================================================
+void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, 
+	float *press, const word *code
+	)const
+{
+		//-Load data of particle p1
+    const tdouble3 posp1=pos[p1];
+		tdouble3 posMar; 
+		MarroneDuplicatePos(p1, pos, idp, posMar);
+		float umar=0, vmar=0, wmar=0, pmar=0;
+		float b11=0, b21=0, b31=0, b41=0;
+		float a11=0, a12=0, a13=0, a14=0, a22=0, a23=0, a24=0, a33=0, a34=0, a44=0;
+		float nx, ny, nz, d;
+		NormalHunter(p1, pos, idp, nx, ny, nz);
+		float dx=posMar.x-posp1.x;
+		float dy=posMar.y-posp1.y;
+		float dz=posMar.z-posp1.z;
+
+		d=sqrt((dx*dx)/2 + (dy*dy)/2 + (dz*dz)/2);
+		
+
+		// Get the elements of the matrix
+		for(unsigned p2=0;p2<Np;p2++)
+		{
+			if(CODE_GetType(code[p2])==CODE_TYPE_FLUID)
+			{
+				tdouble3 posp2=pos[p2];
+				double xij=posMar.x-posp2.x;
+				double yij=posMar.y-posp2.y;
+				double zij=posMar.z-posp2.z;
+				MarroneMatrixElements(xij, yij, zij, p1, p2, velrhop, a11, a12, a13, a14, a22, a23, a24, a33, a34, a44);
+			}
+		}
+
+		// Get the B elements
+		MLSElements(a11, a12, a13, a14, a22, a23, a24, a33, a34, a44, b11, b21, b31, b41);
+
+		// Do the summations around the marrone probe particles
+		for(unsigned p2=0;p2<Np;p2++)
+		{
+			if(CODE_GetType(code[p2])==CODE_TYPE_FLUID)
+			{
+				tdouble3 posp2=pos[p2];
+				double xij=posMar.x-posp2.x;
+				double yij=posMar.y-posp2.y;
+				double zij=posMar.z-posp2.z;
+				
+				float massp2=MassFluid;
+
+				// summing over the surroundign velocity
+				umar+=(massp2/velrhop[p2].w)*velrhop[p2].x*(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
+				vmar+=(massp2/velrhop[p2].w)*velrhop[p2].y*(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
+				wmar+=(massp2/velrhop[p2].w)*velrhop[p2].z*(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
+				// summing pressure
+				pmar+=(massp2/velrhop[p2].w)*press[p2]    *(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
+
+			}
+		}
+
+		// adding the body force term to the pressure
+		pmar+= 2*d*RhopZero*(Gravity.x*nx + Gravity.y*ny + Gravity.z*nz); 
+
+		// zero the velocity of the particle on the physical boundary
+		if(d==0){
+			umar=0;
+			vmar=0;
+			wmar=0;
+
+		}
+
+		// giving the velocities to the boundary particles
+		velrhop[p1].x=umar;
+		velrhop[p1].y=vmar;
+		velrhop[p1].z=wmar;
+		// giving the pressure to the boundary particles
+		press[p1]=pmar;
+
+	}
+		
+
+}
+
+
+//==============================================================================
 /// Realiza interaccion entre particulas. Bound-Fluid/Float
 /// Perform interaction between particles. Bound-Fluid/Float
 //==============================================================================
