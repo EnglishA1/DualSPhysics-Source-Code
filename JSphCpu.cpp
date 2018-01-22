@@ -1055,6 +1055,7 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 					{
 
 						cout << "summed over" << endl;
+						cout << xij << "\t" << zij << endl;
 						MarroneMatrixElements(xij, yij, zij, p1, p2, velrhop, a11, a12, a13, a14, a22, a23, a24, a33, a34, a44);
 					}
 			
