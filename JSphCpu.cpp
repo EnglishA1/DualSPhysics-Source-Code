@@ -705,6 +705,22 @@ float JSphCpu::GetKernelCubicTensil(float rr2,float rhopp1,float pressp1,float r
 }
 
 //==============================================================================
+/// Devuelve valores de kernel Wendland, gradients: frx, fry y frz.
+/// Return values of kernel Wendland: frx, fry and frz.                                                                                SHABA
+//==============================================================================
+float JSphCpu::GetKernelWab(float xij, float yij, float zij)const{
+  const float rr=xij*xij+yij*yij+zij*zij;
+	const float rad=sqrt(rr);
+  const float qq=rad/H;
+  //-Wendland kernel
+  const float wqq1=1.f-0.5f*qq;
+	const float wqq2=2.f*qq+1.f;
+  const float fac=Awen*wqq1*wqq1*wqq1*wqq1*wqq2;
+ 
+	return(fac);
+}
+
+//==============================================================================
 /// Devuelve limites de celdas para interaccion.
 /// Return cell limits for interaction.
 //==============================================================================
@@ -744,12 +760,9 @@ unsigned JSphCpu::FluidHunter(unsigned p1, tdouble3 *pos, unsigned *idp)const
 
 	//cout << idp[pcopy] << "\t" << pos[pcopy].x << "\t" << pos[pcopy].y << "\t" << pos[pcopy].z << endl;
 
-	const unsigned npb0=Npb;
-  const unsigned np0=Np-NpbPer-NpfPer;
-
 	unsigned fluid=0;
 	double distance=10;
-	for(unsigned p2=npb0;p2<np0;p2++){
+	for(unsigned p2=Npb;p2<Np;p2++){
 		double dx=pos[p2].x-boundary.x;
 		double dy=pos[p2].y-boundary.y;
 		double dz=pos[p2].z-boundary.z;
@@ -757,7 +770,7 @@ unsigned JSphCpu::FluidHunter(unsigned p1, tdouble3 *pos, unsigned *idp)const
 		double radius=sqrt(dx*dx + dy*dy + dz*dz);
 		if(radius<=distance){
 			distance=radius;
-			fluid = idp[p2];
+			fluid = p2;
 			//cout << fluid << "\t" << distance << endl;
 			
 		}
@@ -779,12 +792,10 @@ unsigned JSphCpu::BoundaryHunter(unsigned Fluid, tdouble3 *pos, unsigned *idp)co
 	tdouble3 fluid=pos[Fluid];
 
 	//cout << idp[pcopy] << "\t" << pos[pcopy].x << "\t" << pos[pcopy].y << "\t" << pos[pcopy].z << endl;
-
-	const unsigned npb0=Npb;
   
 	unsigned boundary=0;
 	double distance=10;
-	for(unsigned p2=0;p2<npb0;p2++){
+	for(unsigned p2=0;p2<Npb;p2++){
 		double dx=pos[p2].x-fluid.x;
 		double dy=pos[p2].y-fluid.y;
 		double dz=pos[p2].z-fluid.z;
@@ -792,7 +803,7 @@ unsigned JSphCpu::BoundaryHunter(unsigned Fluid, tdouble3 *pos, unsigned *idp)co
 		double radius=sqrt(dx*dx + dy*dy + dz*dz);
 		if(radius<=distance){
 			distance=radius;
-			boundary = idp[p2];
+			boundary = p2;
 			//cout << fluid << "\t" << distance << endl;
 			
 		}
@@ -818,6 +829,7 @@ void JSphCpu::DistBound(unsigned p1, tdouble3 *pos, unsigned *idp, float &dx, fl
 	unsigned fluid = FluidHunter(p1, pos, idp);
 	unsigned boundary=BoundaryHunter(fluid, pos, idp);
 	tdouble3 boundary3=pos[boundary];
+	float Dp2=Dp/2;
 
 	float xdist=boundary3.x-bound.x;
 	float ydist=boundary3.y-bound.y;
@@ -827,9 +839,9 @@ void JSphCpu::DistBound(unsigned p1, tdouble3 *pos, unsigned *idp, float &dx, fl
 	dy=sqrt(ydist*ydist);
 	dz=sqrt(zdist*zdist);
 
-	if(dx-Dp<Dp) xflag=true;
-	if(dy-Dp<Dp) yflag=true;
-	if(dz-Dp<Dp) zflag=true;
+	if(dx-Dp2<0) xflag=true;
+	if(dy-Dp2<0) yflag=true;
+	if(dz-Dp2<0) zflag=true;
 
 	if(xflag) dx=0;
 	if(yflag) dy=0;
@@ -846,7 +858,7 @@ void JSphCpu::DistBound(unsigned p1, tdouble3 *pos, unsigned *idp, float &dx, fl
 void JSphCpu::NormalHunter(unsigned p1, tdouble3 *pos, unsigned *idp, float &nx, float &ny, float &nz)const
 {
 	// get the location of the boundary particle
-	tdouble3 bound=pos[pcopy];
+	tdouble3 bound=pos[p1];
 
 	// get idp of the nearest fluid particle
 	unsigned fluid = FluidHunter(p1, pos, idp);
@@ -887,7 +899,8 @@ float JSphCpu::SignHunter(float number)const
 /// starting from domposmin.
 /// It is controlled that the coordinates of the cell do not exceed the maximum.
 //==============================================================================
-void JSphCpu::MarroneDuplicatePos(unsigned p1,tdouble3 *pos,  unsigned *idp, tdouble3 &posMar)const{
+void JSphCpu::MarroneDuplicatePos(unsigned p1,tdouble3 *pos,  unsigned *idp, tdouble3 &posMar)const
+{
   //-Get pos of particle to be duplicated / Obtiene pos de particula a duplicar.
   posMar=pos[p1];
   //-Find displacement and direction
@@ -934,9 +947,9 @@ void JSphCpu::MarroneMatrixElements(float xij, float yij, float zij, unsigned Ma
 // Finds the Determinant of the 4x4 martix used for the MLS Kernel method in the                 SHABA
 // Marrone Boundary Particle method
 //==============================================================================
-float JSphCpu::MLSDet(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44)const
+float JSphCpu::MLSDet4(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44)const
 {
-	float Determinant=0;
+	float Det=0;
 
 	float det1=0, det2=0, det3=0, det4=0;
 
@@ -945,18 +958,39 @@ float JSphCpu::MLSDet(float a11, float a12, float a13, float a14, float a22, flo
 	det3 = a12*a23*a44 + a22*a34*a14 + a24*a13*a24 - a12*a34*a24 - a22*a13*a44 - a24*a23*a14;
 	det4 = a12*a33*a24 + a22*a13*a34 + a23*a23*a14 - a12*a23*a34 - a22*a33*a14 - a23*a13*a24;
 
-	Determinant = a11*det1 + a12*det2 + det3*a13 + det4*a14;
+	Det = a11*det1 + a12*det2 + det3*a13 + det4*a14;
 
-	return Determinant;
+	return Det;
+	cout << Det << endl;
+}
+
+//==============================================================================
+// Finds the Determinant of the 4x4 martix used for the MLS Kernel method in the                 SHABA
+// Marrone Boundary Particle method
+//==============================================================================
+float JSphCpu::MLSDet3(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44)const
+{
+	float Det=0;
+
+	float det1=0, det2=0, det3=0, det4=0;
+
+	det1 = a11*(a22*a44 - a23*a23);
+	det2 = a12*(a24*a14 - a12*a44);
+	det3 = a14*(a12*a24 - a22*a14);
+
+	Det = det1 + det2 + det3;
+
+	return Det;
+	cout << Det << endl;
 }
 
 //==============================================================================
 // Generates the multipliers of the position differances in the MLS kernel to be                SHABA
 // used in the Marrone boundary particle method
 //==============================================================================
-void JSphCpu::MLSElements(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44, float &b11, float &b21, float &b31, float &b41)const
+void JSphCpu::MLSElements4(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44, float &b11, float &b21, float &b31, float &b41)const
 {
-	float det = MLSDet(a11, a12, a13, a14, a22, a23, a24, a33, a34, a44);
+	float det = MLSDet4(a11, a12, a13, a14, a22, a23, a24, a33, a34, a44);
 
 	b11 = (1/det)*(a22*(a33*a44 - a34*a34) + a13*(a34*a24 - a23*a44) + a24*(a23*a34 - a33*a24));
 	b21 = (1/det)*(a12*(a34*a34 - a33*a44) + a13*(a23*a44 - a34*a24) + a14*(a33*a24 - a23*a34));
@@ -966,10 +1000,25 @@ void JSphCpu::MLSElements(float a11, float a12, float a13, float a14, float a22,
 }
 
 //==============================================================================
+// Generates the multipliers of the position differances in the MLS kernel to be                SHABA
+// used in the Marrone boundary particle method
+//==============================================================================
+void JSphCpu::MLSElements3(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44, float &b11, float &b21, float &b31, float &b41)const
+{
+	float det = MLSDet3(a11, a12, a13, a14, a22, a23, a24, a33, a34, a44);
+
+	b11 = (1/det)*(a22*a44 - a24*a24);
+	b21 = (1/det)*(a14*a24 - a12*a44);
+	b31=0;
+	b41 = (1/det)*(a12*a24 - a14*a22);
+
+}
+
+//==============================================================================
 // Calculates the velocity and pressure at the Marrone probe particles to be fed
 // back into the boundary particles at a later time
 //==============================================================================
-void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, 
+void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velrhop,unsigned *idp, 
 	float *press, const word *code
 	)const
 {
@@ -985,31 +1034,42 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		float dx=posMar.x-posp1.x;
 		float dy=posMar.y-posp1.y;
 		float dz=posMar.z-posp1.z;
+		cout << posp1.x << "\t" << posp1.y << "\t" << posp1.z << endl;
+		cout << posMar.x << "\t" << posMar.y << "\t" << posMar.z << endl;
+
 
 		d=sqrt((dx*dx)/2 + (dy*dy)/2 + (dz*dz)/2);
 		
 
 		// Get the elements of the matrix
-		for(unsigned p2=0;p2<Np;p2++)
+		for(unsigned p2=Npb;p2<Np;p2++)
 		{
-			if(CODE_GetType(code[p2])==CODE_TYPE_FLUID)
-			{
+			
 				tdouble3 posp2=pos[p2];
+				cout << p1 <<"\t" << p2 << endl;
 				double xij=posMar.x-posp2.x;
 				double yij=posMar.y-posp2.y;
 				double zij=posMar.z-posp2.z;
-				MarroneMatrixElements(xij, yij, zij, p1, p2, velrhop, a11, a12, a13, a14, a22, a23, a24, a33, a34, a44);
-			}
+				const float rr2=xij*xij+yij*yij+zij*zij;
+          if(rr2<=Fourh2 && rr2>=ALMOSTZERO)
+					{
+
+						cout << "summed over" << endl;
+						MarroneMatrixElements(xij, yij, zij, p1, p2, velrhop, a11, a12, a13, a14, a22, a23, a24, a33, a34, a44);
+					}
+			
 		}
+		cout << a11 << "  ,  " << a12 << "  ,  " << a13 << "  ,  " << a14 << "  ,  " << a22 << "  ,  " << a23 << "  ,  " << a24 << "  ,  " << a33 << "  ,  " << a34 << "  ,  " << a44 << endl;
 
 		// Get the B elements
-		MLSElements(a11, a12, a13, a14, a22, a23, a24, a33, a34, a44, b11, b21, b31, b41);
+		MLSElements3(a11, a12, a13, a14, a22, a23, a24, a33, a34, a44, b11, b21, b31, b41);
+
+		cout << b11 << "  ,  " << b21 << "  ,  " << b31 << "  ,  " << b41 << endl;
 
 		// Do the summations around the marrone probe particles
-		for(unsigned p2=0;p2<Np;p2++)
+		for(unsigned p2=Npb;p2<Np;p2++)
 		{
-			if(CODE_GetType(code[p2])==CODE_TYPE_FLUID)
-			{
+			
 				tdouble3 posp2=pos[p2];
 				double xij=posMar.x-posp2.x;
 				double yij=posMar.y-posp2.y;
@@ -1017,14 +1077,17 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 				
 				float massp2=MassFluid;
 
-				// summing over the surroundign velocity
-				umar+=(massp2/velrhop[p2].w)*velrhop[p2].x*(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
-				vmar+=(massp2/velrhop[p2].w)*velrhop[p2].y*(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
-				wmar+=(massp2/velrhop[p2].w)*velrhop[p2].z*(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
-				// summing pressure
-				pmar+=(massp2/velrhop[p2].w)*press[p2]    *(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
-
-			}
+				const float rr2=xij*xij+yij*yij+zij*zij;
+          if(rr2<=Fourh2 && rr2>=ALMOSTZERO)
+					{
+						// summing over the surroundign velocity
+						umar+=(massp2/velrhop[p2].w)*velrhop[p2].x*(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
+						vmar+=(massp2/velrhop[p2].w)*velrhop[p2].y*(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
+						wmar+=(massp2/velrhop[p2].w)*velrhop[p2].z*(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
+						// summing pressure
+						pmar+=(massp2/velrhop[p2].w)*press[p2]    *(b11 - xij*b21 - yij*b31 - zij*b41)*GetKernelWab(xij, yij, zij);
+					}
+			
 		}
 
 		// adding the body force term to the pressure
@@ -1045,12 +1108,8 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		// giving the pressure to the boundary particles
 		press[p1]=pmar;
 
-	}
-		
-
 }
-
-
+		
 //==============================================================================
 /// Realiza interaccion entre particulas. Bound-Fluid/Float
 /// Perform interaction between particles. Bound-Fluid/Float
@@ -1058,22 +1117,24 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionForcesBound
   (unsigned n,unsigned pinit,tint4 nc,int hdiv,unsigned cellinitial
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
+  , tdouble3 *pos,const tfloat3 *pspos, tfloat4 *velrhop,const word *code, unsigned *idp, float *press
   ,float &viscdt,float *ar)const
 {
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
-  float viscth[MAXTHREADS_OMP*STRIDE_OMP];
+ /* float viscth[MAXTHREADS_OMP*STRIDE_OMP];
   for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
-  //-Inicia ejecucion con OpenMP.
+  //-Inicia ejecucion con OpenMP.*/
   const int pfin=int(pinit+n);
-  #ifdef _WITHOMP
+  /*#ifdef _WITHOMP
     #pragma omp parallel for schedule (guided)
-  #endif
+  #endif*/
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0;
+		// Do the Marrone Calculatiosn for the Particle
+		InteractionForcesMarrone(p1, pos, velrhop, idp, press, code); // SHABA
 
     //-Load data of particle p1 / Carga datos de particula p1.
-    const tfloat3 velp1=TFloat3(velrhop[p1].x,velrhop[p1].y,velrhop[p1].z);
+    tfloat3 velp1=TFloat3(velrhop[p1].x,velrhop[p1].y,velrhop[p1].z);
     const tfloat3 psposp1=(psimple? pspos[p1]: TFloat3(0));
     const tdouble3 posp1=(psimple? TDouble3(0): pos[p1]);
 
@@ -1129,12 +1190,12 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
     //-Sum results together / Almacena resultados.
     if(arp1||visc){
       ar[p1]+=arp1;
-      const int th=omp_get_thread_num();
-      if(visc>viscth[th*STRIDE_OMP])viscth[th*STRIDE_OMP]=visc;
+     /* const int th=omp_get_thread_num();
+      if(visc>viscth[th*STRIDE_OMP])viscth[th*STRIDE_OMP]=visc;*/
     }
   }
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
-  for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
+  //for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
 }
 
 //==============================================================================
@@ -1145,8 +1206,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   (unsigned n,unsigned pinit,tint4 nc,int hdiv,unsigned cellinitial,float visco
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
   ,const tsymatrix3f* tau,tsymatrix3f* gradvel
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
-  ,const float *press 
+  , tdouble3 *pos,const tfloat3 *pspos, tfloat4 *velrhop,const word *code, unsigned *idp
+  , float *press 
   ,float &viscdt,float *ar,tfloat3 *ace,float *delta
   ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const
 {
@@ -1335,7 +1396,7 @@ template<bool psimple> void JSphCpu::InteractionForcesDEM
   (unsigned nfloat,tint4 nc,int hdiv,unsigned cellfluid
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
   ,const unsigned *ftridp,const StDemData* demobjs
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
+  , tdouble3 *pos,const tfloat3 *pspos, tfloat4 *velrhop,const word *code, unsigned *idp
   ,float &viscdt,tfloat3 *ace)const
 {
   //-Initialize demdtth to calculate max demdt with OpenMP / Inicializa demdtth para calcular demdt maximo con OpenMP.
@@ -1441,7 +1502,7 @@ template<bool psimple> void JSphCpu::InteractionForcesDEM
 //==============================================================================
 /// Computes sub-particle stress tensor (Tau) for SPS turbulence model.   
 //==============================================================================
-void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,const tsymatrix3f *gradvel,tsymatrix3f *tau)const{
+void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini, tfloat4 *velrhop,const tsymatrix3f *gradvel,tsymatrix3f *tau)const{
   const int pfin=int(pini+n);
   #ifdef _WITHOMP
     #pragma omp parallel for schedule (static)
@@ -1474,8 +1535,8 @@ void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,cons
 template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void JSphCpu::Interaction_ForcesT
   (unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
-  ,const float *press
+  , tdouble3 *pos,const tfloat3 *pspos, tfloat4 *velrhop,const word *code, unsigned *idp
+  , float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1485,6 +1546,18 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   const tint3 cellzero=TInt3(cellmin.x,cellmin.y,cellmin.z);
   const unsigned cellfluid=nc.w*nc.z+1;
   const int hdiv=(CellMode==CELLMODE_H? 2: 1);
+
+	/*cout << "p" << "\t" << "idp" << "\t" << "posx" << "  ,  " << "posy" << "  ,  " << "posz" << endl;
+	for(unsigned p=0;p<np;p++)
+	{
+		cout << p << "\t" << idp[p] << "\t" << pos[p].x << "  ,  " << pos[p].y << "  ,  " << pos[p].z << endl;
+	}*/
+
+
+	if(npbok){
+    //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
+    InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp, press,viscdt,ar);
+  }
   
   if(npf){
     //-Interaction Fluid-Fluid / Interaccion Fluid-Fluid
@@ -1498,10 +1571,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
     //-Computes tau for Laminar+SPS.
     if(lamsps)ComputeSpsTau(npf,npb,velrhop,spsgradvel,spstau);
   }
-  if(npbok){
-    //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
-    InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,viscdt,ar);
-  }
+  
 }
 
 //==============================================================================
@@ -1510,8 +1580,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 //==============================================================================
 void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat4 *velrhop,const unsigned *idp,const word *code
-  ,const float *press
+  , tdouble3 *pos, tfloat4 *velrhop, unsigned *idp,const word *code
+  , float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1663,8 +1733,8 @@ void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
 //==============================================================================
 void JSphCpu::InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tfloat3 *pspos,const tfloat4 *velrhop,const unsigned *idp,const word *code
-  ,const float *press
+  ,const tfloat3 *pspos, tfloat4 *velrhop, unsigned *idp,const word *code
+  , float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1931,8 +2001,8 @@ void JSphCpu::ComputeVelrhopBound(const tfloat4* velrhopold,double armul,tfloat4
   #endif
   for(int p=0;p<npb;p++){
     const float rhopnew=float(double(velrhopold[p].w)+armul*Arc[p]);
-    velrhopnew[p]=TFloat4(0,0,0,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorved by boundary ones / Evita q las boundary absorvan a las fluidas.
-  }
+    velrhopnew[p]=TFloat4(velrhopold[p].x,velrhopold[p].y,velrhopold[p].z,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorved by boundary ones / Evita q las boundary absorvan a las fluidas.
+  }// SHABA
 }
 
 //==============================================================================
@@ -2050,8 +2120,8 @@ template<bool shift> void JSphCpu::ComputeSymplecticCorrT(double dt){
   for(int p=0;p<npb;p++){
     const double epsilon_rdot=(-double(Arc[p])/double(Velrhopc[p].w))*dt;
     const float rhopnew=float(double(VelrhopPrec[p].w) * (2.-epsilon_rdot)/(2.+epsilon_rdot));
-    Velrhopc[p]=TFloat4(0,0,0,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorbed by boundary ones / Evita q las boundary absorvan a las fluidas.
-  }
+    Velrhopc[p]=TFloat4(VelrhopPrec[p].x,VelrhopPrec[p].y,VelrhopPrec[p].z,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorbed by boundary ones / Evita q las boundary absorvan a las fluidas.
+  } // SHABA
 
   //-Calculate fluid values / Calcula datos de fluido.
   const double dt05=dt*.5;
