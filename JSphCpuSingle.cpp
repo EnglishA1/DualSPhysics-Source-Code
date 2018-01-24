@@ -147,6 +147,11 @@ void JSphCpuSingle::ConfigDomain(){
   memcpy(Idpc,PartsLoaded->GetIdp(),sizeof(unsigned)*Np);
   memcpy(Velrhopc,PartsLoaded->GetVelRhop(),sizeof(tfloat4)*Np);
 
+	for(unsigned p=0;p<=Np;p++) // SHABA seeting all particle density to 1000 rather than still water density
+ 	{
+			Velrhopc[p].w=1000;
+	}
+
   //-Calculate floating radius / Calcula radio de floatings.
   if(CaseNfloat && PeriActive!=0 && !PartBegin)CalcFloatingRadius(Np,Posc,Idpc);
 
