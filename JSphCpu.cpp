@@ -1038,7 +1038,7 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		cout << posMar.x << "\t" << posMar.y << "\t" << posMar.z << endl;
 
 
-		d=sqrt((dx*dx)/2 + (dy*dy)/2 + (dz*dz)/2);
+		d=sqrt((dx/2)*(dx/2) + (dy/2)*(dy/2) + (dz/2)*(dz/2));
 		
 
 		// Get the elements of the matrix
@@ -1048,8 +1048,11 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 				tdouble3 posp2=pos[p2];
 				cout << p1 <<"\t" << p2 << endl;
 				double xij=posMar.x-posp2.x;
+				
 				double yij=posMar.y-posp2.y;
+				
 				double zij=posMar.z-posp2.z;
+				
 				const float rr2=xij*xij+yij*yij+zij*zij;
           if(rr2<=Fourh2 && rr2>=ALMOSTZERO)
 					{
@@ -1099,7 +1102,7 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 			umar=0;
 			vmar=0;
 			wmar=0;
-
+			pmar=0;
 		}
 
 		// giving the velocities to the boundary particles
