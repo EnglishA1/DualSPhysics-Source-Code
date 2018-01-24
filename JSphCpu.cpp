@@ -1034,8 +1034,8 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		float dx=posMar.x-posp1.x;
 		float dy=posMar.y-posp1.y;
 		float dz=posMar.z-posp1.z;
-		cout << posp1.x << "\t" << posp1.y << "\t" << posp1.z << endl;
-		cout << posMar.x << "\t" << posMar.y << "\t" << posMar.z << endl;
+	//	cout << posp1.x << "\t" << posp1.y << "\t" << posp1.z << endl;
+		//cout << posMar.x << "\t" << posMar.y << "\t" << posMar.z << endl;
 
 
 		d=sqrt((dx/2)*(dx/2) + (dy/2)*(dy/2) + (dz/2)*(dz/2));
@@ -1046,7 +1046,7 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		{
 			
 				tdouble3 posp2=pos[p2];
-				cout << p1 <<"\t" << p2 << endl;
+			//	cout << p1 <<"\t" << p2 << endl;
 				double xij=posMar.x-posp2.x;
 				
 				double yij=posMar.y-posp2.y;
@@ -1057,18 +1057,18 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
           if(rr2<=Fourh2 && rr2>=ALMOSTZERO)
 					{
 
-						cout << "summed over" << endl;
-						cout << xij << "\t" << zij << endl;
+						//cout << "summed over" << endl;
+						//cout << xij << "\t" << zij << endl;
 						MarroneMatrixElements(xij, yij, zij, p1, p2, velrhop, a11, a12, a13, a14, a22, a23, a24, a33, a34, a44);
 					}
 			
 		}
-		cout << a11 << "  ,  " << a12 << "  ,  " << a13 << "  ,  " << a14 << "  ,  " << a22 << "  ,  " << a23 << "  ,  " << a24 << "  ,  " << a33 << "  ,  " << a34 << "  ,  " << a44 << endl;
+		//cout << a11 << "  ,  " << a12 << "  ,  " << a13 << "  ,  " << a14 << "  ,  " << a22 << "  ,  " << a23 << "  ,  " << a24 << "  ,  " << a33 << "  ,  " << a34 << "  ,  " << a44 << endl;
 
 		// Get the B elements
 		MLSElements3(a11, a12, a13, a14, a22, a23, a24, a33, a34, a44, b11, b21, b31, b41);
 
-		cout << b11 << "  ,  " << b21 << "  ,  " << b31 << "  ,  " << b41 << endl;
+		//cout << b11 << "  ,  " << b21 << "  ,  " << b31 << "  ,  " << b41 << endl;
 
 		// Do the summations around the marrone probe particles
 		for(unsigned p2=Npb;p2<Np;p2++)
@@ -1106,11 +1106,12 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		}
 
 		// giving the velocities to the boundary particles
-		velrhop[p1].x=umar;
-		velrhop[p1].y=vmar;
-		velrhop[p1].z=wmar;
+		velrhop[p1].x=-umar;
+		velrhop[p1].y=-vmar;
+		velrhop[p1].z=-wmar;
 		// giving the pressure to the boundary particles
 		press[p1]=pmar;
+		velrhop[p1].w = pow((press[p1]/CteB)+1,1/Gamma)*RhopZero;
 
 }
 		
@@ -1363,6 +1364,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
               }
             }
           }
+					/*bool bound =true;
+					bound =(CODE_GetType(code[p2])==CODE_TYPE_FLUID);
+					if(!bound) velrhop[p1].z=0; // SHABA    Hopefully setting the perpendicular velocity to zero*/
         }
       }
     }
@@ -1558,9 +1562,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 	}*/
 
 
-	if(npbok){
+	if(npb){ // SHABA moved the boundary to be calculated first and then included the whole boundary
     //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
-    InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp, press,viscdt,ar);
+    InteractionForcesBound      <psimple,tker,ftmode> (npb,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp, press,viscdt,ar);
   }
   
   if(npf){

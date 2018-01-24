@@ -24,6 +24,7 @@
 #include "JSphTimersCpu.h"
 #include "JSph.h"
 #include <string>
+#include <cmath>
 
 class JPartsOut;
 class JArraysCpu;

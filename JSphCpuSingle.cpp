@@ -147,10 +147,10 @@ void JSphCpuSingle::ConfigDomain(){
   memcpy(Idpc,PartsLoaded->GetIdp(),sizeof(unsigned)*Np);
   memcpy(Velrhopc,PartsLoaded->GetVelRhop(),sizeof(tfloat4)*Np);
 
-	for(unsigned p=0;p<=Np;p++) // SHABA seeting all particle density to 1000 rather than still water density
+	/*for(unsigned p=0;p<=Np;p++) // SHABA setting all particle density to 1000 rather than still water density, for some reason everything blows up
  	{
 			Velrhopc[p].w=1000;
-	}
+	}*/
 
   //-Calculate floating radius / Calcula radio de floatings.
   if(CaseNfloat && PeriActive!=0 && !PartBegin)CalcFloatingRadius(Np,Posc,Idpc);
@@ -839,6 +839,10 @@ void JSphCpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
   TmcResetValues(Timers);
   TmcStop(Timers,TMC_Init);
   PartNstep=-1; Part++;
+	for(unsigned p=0;p<=Np;p++) // SHABA setting all particle density to 1000 rather than still water density, for some reason everything blows up
+ 	{
+			Velrhopc[p].w=RhopZero;
+	}
 
   //-Main Loop / Bucle principal
   //------------------
