@@ -147,9 +147,6 @@ void JSphCpuSingle::ConfigDomain(){
   memcpy(Idpc,PartsLoaded->GetIdp(),sizeof(unsigned)*Np);
   memcpy(Velrhopc,PartsLoaded->GetVelRhop(),sizeof(tfloat4)*Np);
 
-	for(unsigned p=0;p<=Np;p++)
-		Velrhopc[p].w=1000;
-
   //-Calculate floating radius / Calcula radio de floatings.
   if(CaseNfloat && PeriActive!=0 && !PartBegin)CalcFloatingRadius(Np,Posc,Idpc);
 
@@ -844,6 +841,11 @@ void JSphCpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
   TmcResetValues(Timers);
   TmcStop(Timers,TMC_Init);
   PartNstep=-1; Part++;
+	// SHABA  set all the particles densities to the reference density 
+	for(unsigned p=0;p<=Np;p++)
+	{
+		Velrhopc[p].w=RhopZero;
+	}
 
   //-Main Loop / Bucle principal
   //------------------
