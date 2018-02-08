@@ -800,7 +800,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 
 				// SHABA - hopefully this with do the sums for the shepard filter used in Adami particles
 				//----------------------------------------------
-				for(unsigned p2=pini;p2<pfin;p2++){
+				for(unsigned p2=Npb;p2<Np;p2++){
           const float drx=(psimple? psposp1.x-pspos[p2].x: float(posp1.x-pos[p2].x));
           const float dry=(psimple? psposp1.y-pspos[p2].y: float(posp1.y-pos[p2].y));
           const float drz=(psimple? psposp1.z-pspos[p2].z: float(posp1.z-pos[p2].z));
@@ -858,7 +858,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 		adamiy+=ting2y/ting1;
 		adamiz+=ting2z/ting1;
 
-		adamipress+=(ting2press+Gravity.x*ting2dx+Gravity.y*ting2dy+Gravity.z*ting2dz)/ting1;
+		//adamipress+=(ting2press+Gravity.x*ting2dx+Gravity.y*ting2dy+Gravity.z*ting2dz)/ting1;
 
 
 
@@ -886,8 +886,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 	
 		
 		
-		/*
-
+		
+/*
     //-Load data of particle p1 / Carga datos de particula p1.
     const tfloat3 velp1=TFloat3(velrhop[p1].x,velrhop[p1].y,velrhop[p1].z);
     const tfloat3 psposp1=(psimple? pspos[p1]: TFloat3(0));
@@ -896,7 +896,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
     //-Obtain limits of interaction / Obtiene limites de interaccion                 This is the original                  SHABA
     int cxini,cxfin,yini,yfin,zini,zfin;
     GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
-		*/
+		
     //-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
     for(int z=zini;z<zfin;z++){
       const int zmod=(nc.w)*z+cellinitial; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
@@ -956,7 +956,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   }
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
   for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];*/    // comment out the OpenMP stuff    SHABA
-
+				
 		//cout << idp[p1] << "\t" << velrhop[p1].x << "  "<< velrhop[p1].y << "  "<< velrhop[p1].z << "  prev" << endl;
 		
 			velrhop[p1].x = -adamix, velrhop[p1].y = -adamiy, velrhop[p1].z = adamiz, press[p1] = adamipress;
@@ -1142,10 +1142,6 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
               }
             }
           }
-					bool bound=true;
-					bound=(CODE_GetType(code[p2])==CODE_TYPE_FLUID);
-					if(!bound)
-						velrhop[p1].z=0; // Hopefully zero velocity normal to the boundary near the boundary
         }// particle 2 loop closes here
       }
     }
@@ -1170,7 +1166,17 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
         if(shiftdetect)shiftdetect[p1]+=shiftdetectp1;
       }
     }
-		
+		for(unsigned p2=0;p2<Npb;p2++){ // Hopefully this loop reverses the z velocity for particle close to the boundary     SHABA
+          const float drx=(psimple? psposp1.x-pspos[p2].x: float(posp1.x-pos[p2].x));
+          const float dry=(psimple? psposp1.y-pspos[p2].y: float(posp1.y-pos[p2].y));
+          const float drz=(psimple? psposp1.z-pspos[p2].z: float(posp1.z-pos[p2].z));
+          const float rr2=drx*drx+dry*dry+drz*drz;
+          if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+						velrhop[p1].z=-velp1.z;
+						break;
+					}
+		}
+
   }// particle 1 loop closes here
 	
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
@@ -1339,7 +1345,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 	if(npbok){ //SHABA moved the boundary interaction to happen before the fluid interaction
     //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
 		
-    InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar);
+    InteractionForcesBound      <psimple,tker,ftmode> (npb,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar);
   }
 	
   if(npf){
