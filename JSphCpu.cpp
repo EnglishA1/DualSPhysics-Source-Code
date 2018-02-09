@@ -726,6 +726,119 @@ void JSphCpu::GetInteractionCells(unsigned rcell
 }
 
 //==============================================================================
+//              PARTIAL SLIP BOUNDARY CONDITION CALCULATIONS
+//                              SHABA
+//==============================================================================
+
+//==============================================================================                    SHABA
+// function to find the nearest fluid particle to a boundary particle and therfore 
+// find the normal to the boundary.
+// Function looks the surrounding fluid particles to a boundary particle and
+// calculates the distance between them. The idp of the nearest particle is stored
+// and returned.
+//==============================================================================
+unsigned JSphCpu::FluidHunter(unsigned p1, tdouble3 *pos, unsigned *idp)const
+{
+	// get the location of the boundary particle
+	tdouble3 boundary=pos[p1];
+
+	//cout << idp[pcopy] << "\t" << pos[pcopy].x << "\t" << pos[pcopy].y << "\t" << pos[pcopy].z << endl;
+
+	unsigned fluid=0;
+	double distance=10;
+	for(unsigned p2=Npb;p2<Np;p2++){
+		double dx=pos[p2].x-boundary.x;
+		double dy=pos[p2].y-boundary.y;
+		double dz=pos[p2].z-boundary.z;
+
+		double radius=sqrt(dx*dx + dy*dy + dz*dz);
+		if(radius<=distance){
+			distance=radius;
+			fluid = p2;
+			//cout << fluid << "\t" << distance << endl;
+			
+		}
+	}
+
+	return fluid;
+}
+
+//==============================================================================                    SHABA
+// function to find the nearest fluid particle to a boundary particle and therfore 
+// find the normal to the boundary.
+// Function looks the surrounding fluid particles to a boundary particle and
+// calculates the distance between them. The idp of the nearest particle is stored
+// and returned.
+//==============================================================================
+unsigned JSphCpu::BoundaryHunter(unsigned Fluid, tdouble3 *pos, unsigned *idp)const
+{
+	// get the location of the boundary particle
+	tdouble3 fluid=pos[Fluid];
+
+	//cout << idp[pcopy] << "\t" << pos[pcopy].x << "\t" << pos[pcopy].y << "\t" << pos[pcopy].z << endl;
+  
+	unsigned boundary=0;
+	double distance=10;
+	for(unsigned p2=0;p2<Npb;p2++){
+		double dx=pos[p2].x-fluid.x;
+		double dy=pos[p2].y-fluid.y;
+		double dz=pos[p2].z-fluid.z;
+
+		double radius=sqrt(dx*dx + dy*dy + dz*dz);
+		if(radius<=distance){
+			distance=radius;
+			boundary = p2;
+			//cout << fluid << "\t" << distance << endl;
+			
+		}
+	}
+
+	return boundary;
+}
+
+//=================================================================================                     SHABA
+// Function to find the normal componants to a boundary for the placement of Marrone
+// Boundary Particles. The normal found is the normal pointing into the fluid from the 
+// the boundary. Using this normal Marrone probe particles can be placed along this 
+// normal along with the correct distance from the physical boundary.
+//=================================================================================
+void JSphCpu::NormalHunter(unsigned p1, tdouble3 *pos, unsigned *idp, float &nx, float &ny, float &nz)const
+{
+	// get the location of the boundary particle
+	tdouble3 bound=pos[p1];
+
+	// get idp of the nearest fluid particle
+	unsigned fluid = FluidHunter(p1, pos, idp);
+	unsigned boundary=BoundaryHunter(fluid, pos, idp);
+	tdouble3 boundary3=pos[boundary];
+
+	double xd=boundary3.x-bound.x;
+	double yd=boundary3.y-bound.y;
+	double zd=boundary3.z-bound.z;
+
+	nx=SignHunter(xd);
+	ny=SignHunter(yd);
+	nz=SignHunter(zd);
+}
+
+//==============================================================================                        SHABA
+// Function to find the sign of a number. If the number is positive the function 
+// returns 1, if it is negative the function returns -1. If the number is zero the 
+// function returns 1.
+//==============================================================================
+float JSphCpu::SignHunter(float number)const
+{
+	float norm=0;
+	float zero=0;
+	if(number>zero){
+		norm=1;}
+	if(number<zero){
+		norm=-1;}
+	
+	return norm;
+}
+
+//==============================================================================
 /// Realiza interaccion entre particulas. Bound-Fluid/Float
 /// Perform interaction between particles. Bound-Fluid/Float
 //==============================================================================
