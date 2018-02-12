@@ -168,17 +168,25 @@ protected:
     ,int hdiv,const tint4 &nc,const tint3 &cellzero
     ,int &cxini,int &cxfin,int &yini,int &yfin,int &zini,int &zfin)const;
 
+	// PARTIAL SLIP FUNCTIONS        SHABA
+	unsigned FluidHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
+	unsigned BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsigned *idp)const;
+	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float nx, float ny, float nz)const;
+	float SignHunter(float number)const;
+	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float *SlipVelx, float *SlipVely, float *SlipVelz, float nx, float ny, float nz, float b)const;
+	void PartialSlipCalc(unsigned p1, unsigned n, float *BoundPart, float *SlipVelx, float *SlipVely, float *SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp)const;
+
   template<bool psimple,TpKernel tker,TpFtMode ftmode> void InteractionForcesBound
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellinitial
     ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
-    ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhopp,const word *code,const unsigned *id
+    ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhopp,const word *code,const unsigned *id
     ,float &viscdt,float *ar)const;
 
   template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void InteractionForcesFluid
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellfluid,float visco
     ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
     ,const tsymatrix3f* tau,tsymatrix3f* gradvel
-    ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
+    ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
     ,const float *press
     ,float &viscdt,float *ar,tfloat3 *ace,float *delta
     ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const;
@@ -187,13 +195,13 @@ protected:
     (unsigned nfloat,tint4 nc,int hdiv,unsigned cellfluid
     ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
     ,const unsigned *ftridp,const StDemData* demobjs
-    ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
+    ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
     ,float &viscdt,tfloat3 *ace)const;
 
   template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void Interaction_ForcesT
     (unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-    ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
+    ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
     ,const float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
@@ -201,7 +209,7 @@ protected:
 
   void Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-    ,const tdouble3 *pos,const tfloat4 *velrhop,const unsigned *idp,const word *code
+    ,const tdouble3 *pos,tfloat4 *velrhop,const unsigned *idp,const word *code
     ,const float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
@@ -209,14 +217,14 @@ protected:
 
   void InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-    ,const tfloat3 *pspos,const tfloat4 *velrhop,const unsigned *idp,const word *code
+    ,const tfloat3 *pspos,tfloat4 *velrhop,const unsigned *idp,const word *code
     ,const float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
     ,tfloat3 *shiftpos,float *shiftdetect)const;
 
 
-  void ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,const tsymatrix3f *gradvel,tsymatrix3f *tau)const;
+  void ComputeSpsTau(unsigned n,unsigned pini,tfloat4 *velrhop,const tsymatrix3f *gradvel,tsymatrix3f *tau)const;
 
   void UpdatePos(tdouble3 pos0,double dx,double dy,double dz,bool outrhop,unsigned p,tdouble3 *pos,unsigned *cell,word *code)const;
   template<bool shift> void ComputeVerletVarsFluid(const tfloat4 *velrhop1,const tfloat4 *velrhop2,double dt,double dt2,tdouble3 *pos,unsigned *cell,word *code,tfloat4 *velrhopnew)const;

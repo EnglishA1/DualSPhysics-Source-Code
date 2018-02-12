@@ -737,7 +737,7 @@ void JSphCpu::GetInteractionCells(unsigned rcell
 // calculates the distance between them. The idp of the nearest particle is stored
 // and returned.
 //==============================================================================
-unsigned JSphCpu::FluidHunter(unsigned p1, tdouble3 *pos, unsigned *idp)const
+unsigned JSphCpu::FluidHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const
 {
 	// get the location of the boundary particle
 	tdouble3 boundary=pos[p1];
@@ -770,7 +770,7 @@ unsigned JSphCpu::FluidHunter(unsigned p1, tdouble3 *pos, unsigned *idp)const
 // calculates the distance between them. The idp of the nearest particle is stored
 // and returned.
 //==============================================================================
-unsigned JSphCpu::BoundaryHunter(unsigned Fluid, tdouble3 *pos, unsigned *idp)const
+unsigned JSphCpu::BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsigned *idp)const
 {
 	// get the location of the boundary particle
 	tdouble3 fluid=pos[Fluid];
@@ -802,7 +802,7 @@ unsigned JSphCpu::BoundaryHunter(unsigned Fluid, tdouble3 *pos, unsigned *idp)co
 // the boundary. Using this normal Marrone probe particles can be placed along this 
 // normal along with the correct distance from the physical boundary.
 //=================================================================================
-void JSphCpu::NormalHunter(unsigned p1, tdouble3 *pos, unsigned *idp, float &nx, float &ny, float &nz)const
+void JSphCpu::NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float nx, float ny, float nz)const
 {
 	// get the location of the boundary particle
 	tdouble3 bound=pos[p1];
@@ -816,9 +816,10 @@ void JSphCpu::NormalHunter(unsigned p1, tdouble3 *pos, unsigned *idp, float &nx,
 	double yd=boundary3.y-bound.y;
 	double zd=boundary3.z-bound.z;
 
-	nx=SignHunter(xd);
-	ny=SignHunter(yd);
-	nz=SignHunter(zd);
+	// using the negative differances to have the normal pointing into the fluid
+	nx=SignHunter(-xd);
+	ny=SignHunter(-yd);
+	nz=SignHunter(-zd);
 }
 
 //==============================================================================                        SHABA
@@ -837,6 +838,80 @@ float JSphCpu::SignHunter(float number)const
 	
 	return norm;
 }
+  
+//===============================================================================                                    SHABA
+// Function to calculate the velocity gradient used in the Partial slip boundary 
+// condition summing over all surrounding fluid and boundary particles
+//===============================================================================
+void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float *SlipVelx, float *SlipVely, float *SlipVelz, float nx, float ny, float nz, float b)const
+{
+
+	float ux=0, uy=0, uz=0;
+	float vx=0, vy=0, vz=0;
+	float wx=0, wy=0, wz=0;
+	for( unsigned p2=0; p2<Np;p2++)
+	{
+		const float drx=float(pos[p1].x-pos[p2].x);
+    const float dry=float(pos[p1].y-pos[p2].y);
+    const float drz=float(pos[p1].z-pos[p2].z);
+    const float rr2=drx*drx+dry*dry+drz*drz;
+			if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+      float frx,fry,frz;
+			GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
+			float m2=MassFluid;
+			float uij = float(velrhop[p1].x - velrhop[p2].x);
+			float vij = float(velrhop[p1].y - velrhop[p2].y);
+			float wij = float(velrhop[p1].z - velrhop[p2].z);
+
+			ux+=-(m2/velrhop[p2].w)*uij*(drx/rr2)*frx;
+			uy+=-(m2/velrhop[p2].w)*uij*(dry/rr2)*fry;
+			uz+=-(m2/velrhop[p2].w)*uij*(drz/rr2)*frz;
+
+			vx+=-(m2/velrhop[p2].w)*vij*(drx/rr2)*frx;
+			vy+=-(m2/velrhop[p2].w)*vij*(dry/rr2)*fry;
+			vz+=-(m2/velrhop[p2].w)*vij*(drz/rr2)*frz;
+
+			wx+=-(m2/velrhop[p2].w)*wij*(drx/rr2)*frx;
+			wy+=-(m2/velrhop[p2].w)*wij*(dry/rr2)*fry;
+			wz+=-(m2/velrhop[p2].w)*wij*(drz/rr2)*frz;
+
+			}
+	}
+
+	SlipVelx[p1] = b*((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
+	SlipVely[p1] = b*((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
+	SlipVelz[p1] = b*((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
+}
+
+//================================================================================                                    SHABA
+// Function to find the partilces on the physical boundary, find the normals to the boundary 
+// and calculate the partial slip velocity at these boundary particles
+//================================================================================
+void JSphCpu::PartialSlipCalc(unsigned p1, unsigned n, float *BoundPart, float *SlipVelx, float *SlipVely, float *SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp)const
+{
+
+	float b=0.01; // SLIP LENGTH
+
+	unsigned Fluid = FluidHunter(p1, pos, idp);
+	unsigned Bound = BoundaryHunter(Fluid, pos, idp);
+
+	BoundPart[p1]=Bound;
+
+	float nx=0, ny=0, nz=0;
+
+	if(Bound == p1)
+	{
+		NormalHunter(p1, pos, idp, nx, ny, nz);
+		VelocityGradient(p1, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b);
+	}
+	else
+	{
+		SlipVelx=0;
+		SlipVely=0;
+		SlipVelz=0;
+	}
+
+}
 
 //==============================================================================
 /// Realiza interaccion entre particulas. Bound-Fluid/Float
@@ -845,9 +920,34 @@ float JSphCpu::SignHunter(float number)const
 template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionForcesBound
   (unsigned n,unsigned pinit,tint4 nc,int hdiv,unsigned cellinitial
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
+  ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
   ,float &viscdt,float *ar)const
 {
+
+	double  *BoundPart, *SlipVelx, *SlipVely, *SlipVelz;
+	BoundPart= new double[Npb];
+	SlipVelx = new double[Npb];
+	SlipVely = new double[Npb];
+	SlipVelz = new double[Npb];
+
+
+	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
+	{
+		PartialSlipCalc(p1, n, BoundPart, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp);
+	}
+
+	for (int p1=0;p1<Npb;p1++) // assigning particles partial slip velocities
+	{
+		Slipvelx[p1] = SlipVelx[BoundPart[p1]];
+		Slipvely[p1] = SlipVely[BoundPart[p1]];
+		Slipvelz[p1] = SlipVelz[BoundPart[p1]];
+
+		velrhop[p1].x = SlipVelx[p1];
+		velrhop[p1].y = SlipVely[p1];
+		velrhop[p1].z = SlipVelz[p1];
+	}
+
+
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[MAXTHREADS_OMP*STRIDE_OMP];
   for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
@@ -932,7 +1032,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   (unsigned n,unsigned pinit,tint4 nc,int hdiv,unsigned cellinitial,float visco
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
   ,const tsymatrix3f* tau,tsymatrix3f* gradvel
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
+  ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
   ,const float *press 
   ,float &viscdt,float *ar,tfloat3 *ace,float *delta
   ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1122,7 +1222,7 @@ template<bool psimple> void JSphCpu::InteractionForcesDEM
   (unsigned nfloat,tint4 nc,int hdiv,unsigned cellfluid
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
   ,const unsigned *ftridp,const StDemData* demobjs
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
+  ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
   ,float &viscdt,tfloat3 *ace)const
 {
   //-Initialize demdtth to calculate max demdt with OpenMP / Inicializa demdtth para calcular demdt maximo con OpenMP.
@@ -1228,7 +1328,7 @@ template<bool psimple> void JSphCpu::InteractionForcesDEM
 //==============================================================================
 /// Computes sub-particle stress tensor (Tau) for SPS turbulence model.   
 //==============================================================================
-void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,const tsymatrix3f *gradvel,tsymatrix3f *tau)const{
+void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini,tfloat4 *velrhop,const tsymatrix3f *gradvel,tsymatrix3f *tau)const{
   const int pfin=int(pini+n);
   #ifdef _WITHOMP
     #pragma omp parallel for schedule (static)
@@ -1261,7 +1361,7 @@ void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,cons
 template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void JSphCpu::Interaction_ForcesT
   (unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
+  ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
   ,const float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
@@ -1273,6 +1373,11 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   const unsigned cellfluid=nc.w*nc.z+1;
   const int hdiv=(CellMode==CELLMODE_H? 2: 1);
   
+	if(npb){
+    //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
+    InteractionForcesBound      <psimple,tker,ftmode> (npb,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,viscdt,ar);
+  }
+
   if(npf){
     //-Interaction Fluid-Fluid / Interaccion Fluid-Fluid
     InteractionForcesFluid<psimple,tker,ftmode,lamsps,tdelta,shift> (npf,npb,nc,hdiv,cellfluid,Visco                 ,begincell,cellzero,dcell,spstau,spsgradvel,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,tshifting,shiftpos,shiftdetect);
@@ -1285,10 +1390,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
     //-Computes tau for Laminar+SPS.
     if(lamsps)ComputeSpsTau(npf,npb,velrhop,spsgradvel,spstau);
   }
-  if(npbok){
-    //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
-    InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,viscdt,ar);
-  }
+  
 }
 
 //==============================================================================
@@ -1297,7 +1399,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 //==============================================================================
 void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat4 *velrhop,const unsigned *idp,const word *code
+  ,const tdouble3 *pos,tfloat4 *velrhop,const unsigned *idp,const word *code
   ,const float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
@@ -1450,7 +1552,7 @@ void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
 //==============================================================================
 void JSphCpu::InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tfloat3 *pspos,const tfloat4 *velrhop,const unsigned *idp,const word *code
+  ,const tfloat3 *pspos,tfloat4 *velrhop,const unsigned *idp,const word *code
   ,const float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
