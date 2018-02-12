@@ -173,8 +173,9 @@ protected:
 	unsigned BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsigned *idp)const;
 	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float nx, float ny, float nz)const;
 	float SignHunter(float number)const;
-	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float *SlipVelx, float *SlipVely, float *SlipVelz, float nx, float ny, float nz, float b)const;
-	void PartialSlipCalc(unsigned p1, unsigned n, float *BoundPart, float *SlipVelx, float *SlipVely, float *SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp)const;
+	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float SlipVelx, float SlipVely, float SlipVelz, float nx, float ny, float nz, float b)const;
+	unsigned IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
+	void PartialSlipCalc(unsigned p1, unsigned n, float SlipVelx, float SlipVely, float SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp)const;
 
   template<bool psimple,TpKernel tker,TpFtMode ftmode> void InteractionForcesBound
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellinitial
