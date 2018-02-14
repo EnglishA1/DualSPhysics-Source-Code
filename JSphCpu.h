@@ -160,7 +160,7 @@ protected:
   void PosInteraction_Forces();
 
   inline void GetKernel(float rr2,float drx,float dry,float drz,float &frx,float &fry,float &frz)const;
-	inline float GetKernelWab(float rr2,float drx,float dry,float drz,float &frx,float &fry,float &frz)const;                                                             // SHABA
+	inline float GetKernelWab(float rr2,float drx,float dry,float drz)const;                                                             // SHABA   Wendland kernel sum for Shepard filter
   inline void GetKernelCubic(float rr2,float drx,float dry,float drz,float &frx,float &fry,float &frz)const;
   inline float GetKernelCubicTensil(float rr2,float rhopp1,float pressp1,float rhopp2,float pressp2)const;
 
@@ -168,19 +168,23 @@ protected:
     ,int hdiv,const tint4 &nc,const tint3 &cellzero
     ,int &cxini,int &cxfin,int &yini,int &yfin,int &zini,int &zfin)const;
 
+	// New Adami calculation                      SHABA
+	void AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, float *press, float &Adamix, float &Adamiy, float &Adamiz, float &AdamiPress, float &AdamiRhop)const;
+	unsigned Bouncer(unsigned PartID, const word *code, const unsigned *idp) const;
+
   template<bool psimple,TpKernel tker,TpFtMode ftmode> void InteractionForcesBound
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellinitial
     ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
     ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhopp,const word *code,const unsigned *id
-		,float *press
-    ,float &viscdt,float *ar)const; //          ^ changed from const to float SHABA
+		,float *press  // changed from const to float along with velrhop                                      SHABA
+    ,float &viscdt,float *ar)const; 
 
   template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void InteractionForcesFluid
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellfluid,float visco
     ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
     ,const tsymatrix3f* tau,tsymatrix3f* gradvel
     ,const tdouble3 *pos,const tfloat3 *pspos, tfloat4 *velrhop,const word *code,const unsigned *idp
-    ,const float *press
+    , float *press // Changed from const to just float along with velrhop                                 SHABA
     ,float &viscdt,float *ar,tfloat3 *ace,float *delta
     ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const;
 
