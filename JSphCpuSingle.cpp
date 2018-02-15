@@ -503,7 +503,7 @@ void JSphCpuSingle::Interaction_Forces(TpInter tinter){
   float viscdt=0;
   if(Psimple)JSphCpu::InteractionSimple_Forces(Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellc,PsPosc,Velrhopc,Idpc,Codec,Pressc,viscdt,Arc,Acec,Deltac,SpsTauc,SpsGradvelc,ShiftPosc,ShiftDetectc);
   else JSphCpu::Interaction_Forces(Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellc,Posc,Velrhopc,Idpc,Codec,Pressc,viscdt,Arc,Acec,Deltac,SpsTauc,SpsGradvelc,ShiftPosc,ShiftDetectc);
-
+	
   //-For 2-D simulations zero the 2nd component / Para simulaciones 2D anula siempre la 2º componente
   if(Simulate2D){
     const int ini=int(Npb),fin=int(Np),npf=int(Np-Npb);
@@ -615,7 +615,7 @@ double JSphCpuSingle::ComputeStep_Sym(){
   //-Predictor
   //-----------
   DemDtForce=dt*0.5f;                     //(DEM)
-  Interaction_Forces(INTER_Forces);       //-Interaction / Interaccion
+	Interaction_Forces(INTER_Forces);       //-Interaction / Interaccion
   const double ddt_p=DtVariable(false);   //-Calculate dt of predictor step / Calcula dt del predictor
   if(TShifting)RunShifting(dt*.5);        //-Shifting
   ComputeSymplecticPre(dt);               //-Apply Symplectic-Predictor to particles / Aplica Symplectic-Predictor a las particulas

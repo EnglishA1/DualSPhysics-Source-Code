@@ -802,19 +802,23 @@ unsigned JSphCpu::BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsi
 // the boundary. Using this normal Marrone probe particles can be placed along this 
 // normal along with the correct distance from the physical boundary.
 //=================================================================================
-void JSphCpu::NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float nx, float ny, float nz)const
+void JSphCpu::NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float &nx, float &ny, float &nz)const
 {
 	// get the location of the boundary particle
 	tdouble3 bound=pos[p1];
+	unsigned part1 = Idpc[p1];
 
 	// get idp of the nearest fluid particle
 	unsigned fluid = FluidHunter(p1, pos, idp);
 	unsigned boundary=BoundaryHunter(fluid, pos, idp);
 	tdouble3 boundary3=pos[boundary];
+	tdouble3 fluid3=pos[fluid];
+	unsigned partfluid = Idpc[fluid];
+	unsigned partbound = Idpc[boundary];
 
-	double xd=boundary3.x-bound.x;
-	double yd=boundary3.y-bound.y;
-	double zd=boundary3.z-bound.z;
+	double xd=boundary3.x-fluid3.x;
+	double yd=boundary3.y-fluid3.y;
+	double zd=boundary3.z-fluid3.z;
 
 	// using the negative differances to have the normal pointing into the fluid
 	nx=SignHunter(-xd);
@@ -827,7 +831,7 @@ void JSphCpu::NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp
 // returns 1, if it is negative the function returns -1. If the number is zero the 
 // function returns 1.
 //==============================================================================
-float JSphCpu::SignHunter(float number)const
+float JSphCpu::SignHunter(double number)const
 {
 	float norm=0;
 	float zero=0;
@@ -843,7 +847,7 @@ float JSphCpu::SignHunter(float number)const
 // Function to calculate the velocity gradient used in the Partial slip boundary 
 // condition summing over all surrounding fluid and boundary particles
 //===============================================================================
-void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float SlipVelx, float SlipVely, float SlipVelz, float nx, float ny, float nz, float b)const
+void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b)const
 {
 
 	float ux=0, uy=0, uz=0;
@@ -875,12 +879,14 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 			wy+=-(m2/velrhop[p2].w)*wij*(dry/rr2)*fry;
 			wz+=-(m2/velrhop[p2].w)*wij*(drz/rr2)*frz;
 
+			
+				//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
 			}
 	}
 
-	SlipVelx = b*((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
-	SlipVely = b*((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
-	SlipVelz = b*((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
+	SlipVelx += b*((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
+	SlipVely += b*((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
+	SlipVelz += b*((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
 }
 
 //================================================================================
@@ -895,30 +901,67 @@ unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)
 	return Bound;
 }
 
+//================================================================================
+// Function to find the furthest particle behind the particle on the physical boundary
+// Returns the particle number
+//================================================================================
+unsigned JSphCpu::FullBackFinder(unsigned p1, unsigned &HalfPenny, const tdouble3 *pos, float nx, float ny, float nz)const
+{
+
+	tdouble3 posBound = pos[p1];
+	tdouble3 Hogg;
+	Hogg.x = posBound.x - nx*6.5*Dp;
+	Hogg.y = posBound.y - ny*6.5*Dp;
+	Hogg.z = posBound.z - nz*6.5*Dp;
+
+	double distance=10;
+	for(unsigned p2=0;p2<Npb;p2++){
+		double dx=pos[p2].x-Hogg.x;
+		double dy=pos[p2].y-Hogg.y;
+		double dz=pos[p2].z-Hogg.z;
+
+		double radius=sqrt(dx*dx + dy*dy + dz*dz);
+		if(radius<=distance){
+			distance=radius;
+			HalfPenny = p2;			
+		}
+	}
+
+}
+
 //================================================================================                                    SHABA
 // Function to find the partilces on the physical boundary, find the normals to the boundary 
 // and calculate the partial slip velocity at these boundary particles
 //================================================================================
-void JSphCpu::PartialSlipCalc(unsigned p1, unsigned n, float SlipVelx, float SlipVely, float SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp)const
+void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float &BoundCounter)const
 {
 
-	float b=0.01; // SLIP LENGTH
+	float b=0.01f; // SLIP LENGTH
 
 	unsigned Bound = IsBound(p1, pos, idp);
 
 	float nx=0, ny=0, nz=0;
+	unsigned HalfPenny=0;
 
 	if(Bound == p1)
 	{
 		NormalHunter(p1, pos, idp, nx, ny, nz);
 		VelocityGradient(p1, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b);
+		FullBackFinder(p1, HalfPenny, pos, nx, ny, nz);
 	}
 	else
 	{
 		SlipVelx=0;
 		SlipVely=0;
 		SlipVelz=0;
+		
 	}
+	
+	velrhop[HalfPenny].x += SlipVelx;
+	velrhop[HalfPenny].y += SlipVely;
+	velrhop[HalfPenny].z += SlipVelz;
+	
+
 
 }
 
@@ -932,32 +975,31 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
   ,float &viscdt,float *ar)const
 {
-
+	
 	unsigned	BoundPart = 0;
+	float BoundCounter=0;
 	float SlipVelx=0, SlipVely=0, SlipVelz=0;
 
 
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
 	{
-		PartialSlipCalc(p1, n, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp);
+		PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp, BoundCounter);
 	}
+	
+
 
 	for (unsigned p1=0;p1<Npb;p1++) // assigning particles partial slip velocities
 	{
-		velrhop[p1].x = SlipVelx;
-		velrhop[p1].y = SlipVely;
-		velrhop[p1].z = SlipVelz;
+		float nx=0,ny=0,nz=0,HalfPenny=0;
+		NormalHunter(p1, pos, idp, nx, ny, nz);
+		VelocityGradient(p1, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b);
+		FullBackFinder(p1, HalfPenny, pos, nx, ny, nz);
+
+		velrhop[p1].x = velrhop[HalfPenny].x;
+		velrhop[p1].y = velrhop[HalfPenny].y;
+		velrhop[p1].z = velrhop[HalfPenny].z;
 	}
-
-	for (unsigned p1=0;p1<Npb;p1++) // assigning particles partial slip velocities
-	{
-		BoundPart = IsBound(p1,pos, idp);
-
-		velrhop[p1].x = velrhop[BoundPart].x;
-		velrhop[p1].y = velrhop[BoundPart].y;
-		velrhop[p1].z = velrhop[BoundPart].z;
-	}
-
+	
 
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[MAXTHREADS_OMP*STRIDE_OMP];
@@ -1950,7 +1992,7 @@ template<bool shift> void JSphCpu::ComputeSymplecticCorrT(double dt){
   for(int p=0;p<npb;p++){
     const double epsilon_rdot=(-double(Arc[p])/double(Velrhopc[p].w))*dt;
     const float rhopnew=float(double(VelrhopPrec[p].w) * (2.-epsilon_rdot)/(2.+epsilon_rdot));
-    Velrhopc[p]=TFloat4(VelrhopPrec[p].x,VelrhopPrec[p].x,VelrhopPrec[p].x,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorbed by boundary ones / Evita q las boundary absorvan a las fluidas.
+    Velrhopc[p]=TFloat4(VelrhopPrec[p].x,VelrhopPrec[p].y,VelrhopPrec[p].z,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorbed by boundary ones / Evita q las boundary absorvan a las fluidas.
   }
 
   //-Calculate fluid values / Calcula datos de fluido.

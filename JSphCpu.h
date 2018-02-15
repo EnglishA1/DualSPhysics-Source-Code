@@ -169,13 +169,16 @@ protected:
     ,int &cxini,int &cxfin,int &yini,int &yfin,int &zini,int &zfin)const;
 
 	// PARTIAL SLIP FUNCTIONS        SHABA
+	//===============================================================================================
 	unsigned FluidHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	unsigned BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsigned *idp)const;
-	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float nx, float ny, float nz)const;
-	float SignHunter(float number)const;
-	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float SlipVelx, float SlipVely, float SlipVelz, float nx, float ny, float nz, float b)const;
+	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float &nx, float &ny, float &nz)const;
+	float SignHunter(double number)const;
+	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b)const;
 	unsigned IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
-	void PartialSlipCalc(unsigned p1, unsigned n, float SlipVelx, float SlipVely, float SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp)const;
+	unsigned FullBackFinder(unsigned p1, unsigned &HalfPenny, const tdouble3 *pos, float nx, float ny, float nz)const;
+	void PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float &BoundCounter)const;
+	//================================================================================================
 
   template<bool psimple,TpKernel tker,TpFtMode ftmode> void InteractionForcesBound
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellinitial
