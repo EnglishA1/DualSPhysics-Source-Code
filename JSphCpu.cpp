@@ -1040,6 +1040,27 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
               compute=!(USE_DEM && ftp1 && (boundp2 || ftp2)); //-Deactivate when using DEM and if it is of type float-float or float-bound / Se desactiva cuando se usa DEM y es float-float o float-bound.
 						}
 
+						// if p2 is a boundary particle, it it given the Adami properties
+						// position 2
+						/*if(p2<NpbOk){
+							velp2.x = Adamix;
+							velp2.y = Adamiy;
+							velp2.z = Adamiz;
+
+							//pressp2 = AdamiPress;
+							//rhopp2 = AdamiRhop;
+
+							//dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
+						}
+
+						//moved from before the density derivative
+						//===== Acceleration ===== 
+            if(compute){
+              const float prs=(pressp1+pressp2)/(rhopp1*rhopp2) + (tker==KERNEL_Cubic? GetKernelCubicTensil(rr2,rhopp1,pressp1,velrhop[p2].w,press[p2]): 0);
+              const float p_vpm=-prs*massp2*ftmassp1;
+              acep1.x+=p_vpm*frx; acep1.y+=p_vpm*fry; acep1.z+=p_vpm*frz;
+            }*/
+
 						// Reorder the calculation for Adami particles
             //-Density derivative
             float dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
@@ -1056,6 +1077,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
             }
 
 						// if p2 is a boundary particle, it it given the Adami properties
+						//position 1
 						if(p2<NpbOk){
 							velp2.x = Adamix;
 							velp2.y = Adamiy;
