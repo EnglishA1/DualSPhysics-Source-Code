@@ -905,7 +905,7 @@ unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)
 // Function to find the furthest particle behind the particle on the physical boundary
 // Returns the particle number
 //================================================================================
-unsigned JSphCpu::FullBackFinder(unsigned p1, unsigned &HalfPenny, const tdouble3 *pos, float nx, float ny, float nz)const
+void JSphCpu::FullBackFinder(unsigned p1, unsigned &HalfPenny, const tdouble3 *pos, float nx, float ny, float nz)const
 {
 
 	tdouble3 posBound = pos[p1];
@@ -933,11 +933,8 @@ unsigned JSphCpu::FullBackFinder(unsigned p1, unsigned &HalfPenny, const tdouble
 // Function to find the partilces on the physical boundary, find the normals to the boundary 
 // and calculate the partial slip velocity at these boundary particles
 //================================================================================
-void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float &BoundCounter)const
+void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float b)const
 {
-
-	float b=0.01f; // SLIP LENGTH
-
 	unsigned Bound = IsBound(p1, pos, idp);
 
 	float nx=0, ny=0, nz=0;
@@ -960,9 +957,25 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 	velrhop[HalfPenny].x += SlipVelx;
 	velrhop[HalfPenny].y += SlipVely;
 	velrhop[HalfPenny].z += SlipVelz;
-	
+}
 
+//==============================================================================
+// function to find the non-periodic particle associated to a particle id (idp)
+//==============================================================================
+unsigned JSphCpu::Bouncer(unsigned PartID, const word *code, const unsigned *idp) const
+{
+	unsigned Particle=0;
+	for(unsigned p=0;p<Np;p++)
+	{
+		bool PerryCox=(CODE_GetTypeValue(code[p])==CODE_PERIODIC);
+		if(idp[p]==PartID){
+			if(!PerryCox){
+				Particle = p;
+			}
+		}
 
+	}
+	return(Particle);
 }
 
 //==============================================================================
@@ -975,31 +988,42 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
   ,float &viscdt,float *ar)const
 {
-	
-	unsigned	BoundPart = 0;
-	float BoundCounter=0;
+	float b=0.01f; // SLIP LENGTH
 	float SlipVelx=0, SlipVely=0, SlipVelz=0;
 
 
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
 	{
-		PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp, BoundCounter);
+		PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b);
 	}
-	
-
 
 	for (unsigned p1=0;p1<Npb;p1++) // assigning particles partial slip velocities
 	{
-		float nx=0,ny=0,nz=0,HalfPenny=0;
+		float nx=0,ny=0,nz=0;
+		unsigned HalfPenny=0;
 		NormalHunter(p1, pos, idp, nx, ny, nz);
 		VelocityGradient(p1, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b);
 		FullBackFinder(p1, HalfPenny, pos, nx, ny, nz);
 
-		velrhop[p1].x = velrhop[HalfPenny].x;
-		velrhop[p1].y = velrhop[HalfPenny].y;
-		velrhop[p1].z = velrhop[HalfPenny].z;
+		velrhop[p1].x = 0.4f; //velrhop[HalfPenny].x;
+		velrhop[p1].y = 0.0f; //velrhop[HalfPenny].y;
+		velrhop[p1].z = 0.0f; //velrhop[HalfPenny].z;
 	}
 	
+	//periodic particle loop
+	for(unsigned p1=0;p1<Npb;p1++){
+
+		bool PerryCox = false;
+		PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
+		if(PerryCox){
+		unsigned PartID = idp[p1];
+		unsigned p2 = Bouncer(PartID, code, idp);
+		velrhop[p1].x = velrhop[p2].x;
+		velrhop[p1].y = velrhop[p2].y;
+		velrhop[p1].z = velrhop[p2].z;
+		
+		}
+	}
 
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[MAXTHREADS_OMP*STRIDE_OMP];

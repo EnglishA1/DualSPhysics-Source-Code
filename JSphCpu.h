@@ -176,8 +176,9 @@ protected:
 	float SignHunter(double number)const;
 	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b)const;
 	unsigned IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
-	unsigned FullBackFinder(unsigned p1, unsigned &HalfPenny, const tdouble3 *pos, float nx, float ny, float nz)const;
-	void PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float &BoundCounter)const;
+	void FullBackFinder(unsigned p1, unsigned &HalfPenny, const tdouble3 *pos, float nx, float ny, float nz)const;
+	void PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float b)const;
+	unsigned Bouncer(unsigned PartID, const word *code, const unsigned *idp) const;
 	//================================================================================================
 
   template<bool psimple,TpKernel tker,TpFtMode ftmode> void InteractionForcesBound
