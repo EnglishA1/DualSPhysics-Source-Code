@@ -839,6 +839,10 @@ void JSphCpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
   TmcResetValues(Timers);
   TmcStop(Timers,TMC_Init);
   PartNstep=-1; Part++;
+	for(unsigned p=0;p<Np;p++) // SHABA setting all particle density to 1000 rather than still water density, for some reason everything blows up
+ 	{
+			Velrhopc[p].w=RhopZero;
+	}
 
   //-Main Loop / Bucle principal
   //------------------

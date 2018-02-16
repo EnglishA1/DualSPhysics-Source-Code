@@ -855,7 +855,7 @@ float JSphCpu::SignHunter(double number)const
 // Function to calculate the velocity gradient used in the Partial slip boundary 
 // condition summing over all surrounding fluid and boundary particles
 //===============================================================================
-void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b)const
+void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, double nx, double ny, double nz, float b)const
 {
 
 	float ux=0, uy=0, uz=0;
@@ -868,6 +868,10 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
     const float drz=float(pos[p1].z-pos[p2].z);
     const float rr2=drx*drx+dry*dry+drz*drz;
 			if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+				if(Idpc[p1]==95){
+					cout << p1 << "\t" <<  pos[p1].x << "\t" <<  pos[p1].y << "\t" <<  pos[p1].z << endl;
+					cout << p2 << "\t" <<  pos[p2].x << "\t" <<  pos[p2].y << "\t" <<  pos[p2].z << endl;
+				}
       float frx,fry,frz;
 			GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
 			float m2=MassFluid;
@@ -919,13 +923,13 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 {
 	unsigned Bound = IsBound(p1, pos, idp);
 
-	float nx=0, ny=0, nz=0;
+	double nx=0, ny=0, nz=0;
 
 	if(Bound == p1)
 	{
 		//NormalHunter(p1, pos, idp, nx, ny, nz);
-		if (Posc[p1].z<0)nz=1;
-		if (Posc[p1].z>0)nz=-1;
+		if (Posc[p1].z<0)nz=1.0;
+		if (Posc[p1].z>0)nz=-1.0;
 		VelocityGradient(p1, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b);
 	}
 	else

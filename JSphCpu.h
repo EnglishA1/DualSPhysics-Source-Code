@@ -175,7 +175,7 @@ protected:
 	unsigned BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsigned *idp)const;
 	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float &nx, float &ny, float &nz)const;
 	float SignHunter(double number)const;
-	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b)const;
+	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, double nx, double ny, double nz, float b)const;
 	unsigned IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	void PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float b)const;
 	unsigned Bouncer(unsigned PartID, const word *code, const unsigned *idp) const;
