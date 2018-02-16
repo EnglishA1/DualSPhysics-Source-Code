@@ -77,6 +77,7 @@ void JSphCpu::InitVars(){
   NpbPer=NpfPer=0;
   WithFloating=false;
 
+	SlipVel=NULL;// Slip Velocity       SHABA
   Idpc=NULL; Codec=NULL; Dcellc=NULL; Posc=NULL; Velrhopc=NULL;
   VelrhopM1c=NULL;                //-Verlet
   PosPrec=NULL; VelrhopPrec=NULL; //-Symplectic
@@ -98,6 +99,7 @@ void JSphCpu::InitVars(){
 //==============================================================================
 void JSphCpu::FreeCpuMemoryFixed(){
   MemCpuFixed=0;
+	delete[] SlipVel;  SlipVel=NULL;// Slip Velocity       SHABA
   delete[] RidpMove;  RidpMove=NULL;
   delete[] FtRidp;    FtRidp=NULL;
   delete[] FtoForces; FtoForces=NULL;
@@ -108,6 +110,7 @@ void JSphCpu::FreeCpuMemoryFixed(){
 //==============================================================================
 void JSphCpu::AllocCpuMemoryFixed(){
   MemCpuFixed=0;
+	SlipVel=new tfloat3[Npb]; MemCpuFixed+=(sizeof(tfloat3)*Npb); // Slip Velocity       SHABA
   try{
     //-Allocates memory for moving objects.
     if(CaseNmoving){
@@ -895,9 +898,11 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 //================================================================================
 unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const
 {
+	//cout << p1 << "\t" << p1 << "\t" << pos[p1].x << "\t" << pos[p1].y << "\t" << pos[p1].z << "\t" << endl;
 	unsigned Fluid = FluidHunter(p1, pos, idp);
+	//cout << p1 << "\t" << Fluid << "\t" << pos[Fluid].x << "\t" << pos[Fluid].y << "\t" << pos[Fluid].z << "\t" << endl;
 	unsigned Bound = BoundaryHunter(Fluid, pos, idp);
-
+	//cout << p1 << "\t" << Bound << "\t" << pos[Bound].x << "\t" << pos[Bound].y << "\t" << pos[Bound].z << "\t" << endl;
 	return Bound;
 }
 
@@ -1005,9 +1010,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 		VelocityGradient(p1, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b);
 		FullBackFinder(p1, HalfPenny, pos, nx, ny, nz);
 
-		velrhop[p1].x = 0.4f; //velrhop[HalfPenny].x;
+		velrhop[p1].x =  velrhop[HalfPenny].x;
 		velrhop[p1].y = 0.0f; //velrhop[HalfPenny].y;
-		velrhop[p1].z = 0.0f; //velrhop[HalfPenny].z;
+		velrhop[p1].z = 0.0f;//velrhop[HalfPenny].z;
 	}
 	
 	//periodic particle loop

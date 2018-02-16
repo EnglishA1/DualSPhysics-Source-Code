@@ -170,6 +170,7 @@ protected:
 
 	// PARTIAL SLIP FUNCTIONS        SHABA
 	//===============================================================================================
+	tfloat3 *SlipVel; // Slip Velocity       SHABA
 	unsigned FluidHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	unsigned BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsigned *idp)const;
 	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float &nx, float &ny, float &nz)const;
