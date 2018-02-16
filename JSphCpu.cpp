@@ -892,9 +892,9 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 			}
 	}
 
-	SlipVelx += b*((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
-	SlipVely += b*((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
-	SlipVelz += b*((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
+	SlipVelx = b*((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
+	SlipVely =0;//= b*((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
+	SlipVelz =0;//= b*((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
 }
 
 //================================================================================
@@ -923,7 +923,9 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 
 	if(Bound == p1)
 	{
-		NormalHunter(p1, pos, idp, nx, ny, nz);
+		//NormalHunter(p1, pos, idp, nx, ny, nz);
+		if (Posc[p1].z<0)nz=1;
+		if (Posc[p1].z>0)nz=-1;
 		VelocityGradient(p1, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b);
 	}
 	else
@@ -970,17 +972,15 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 	float b=0.01f; // SLIP LENGTH
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
 	{
-		float SlipVelx=0, SlipVely=0, SlipVelz=0;
-		PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b);
+		
+			float SlipVelx=0, SlipVely=0, SlipVelz=0;
+			PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b);
+		
 	}
 
 	for (unsigned p1=0;p1<Npb;p1++) // assigning particles partial slip velocities
 	{
-		unsigned Bound = IsBound(p1, pos, idp);
-		SlipVel[p1].x = SlipVel[Bound].x;
-		SlipVel[p1].y = SlipVel[Bound].y;
-		SlipVel[p1].z = SlipVel[Bound].z;
-
+		//unsigned Bound = IsBound(p1, pos, idp);
 		velrhop[p1].x = SlipVel[p1].x;
 		velrhop[p1].y = SlipVel[p1].y;
 		velrhop[p1].z = SlipVel[p1].z;

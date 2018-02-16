@@ -418,12 +418,13 @@ void JSphCpuSingle::RunPeriodic(){
 //==============================================================================
 void JSphCpuSingle::RunCellDivide(bool updateperiodic){
   const char met[]="RunCellDivide";
+	
   //-Create new periodic particles & mark the old ones to be ignored / Crea nuevas particulas periodicas y marca las viejas para ignorarlas.
   if(updateperiodic && PeriActive)RunPeriodic();
-
+	
   //-Initial Divide / Inicia Divide.
   CellDivSingle->Divide(Npb,Np-Npb-NpbPer-NpfPer,NpbPer,NpfPer,BoundChanged,Dcellc,Codec,Idpc,Posc,Timers);
-
+	
   //-Order particle data / Ordena datos de particulas
   TmcStart(Timers,TMC_NlSortData);
   CellDivSingle->SortArray(Idpc);
@@ -467,6 +468,10 @@ void JSphCpuSingle::RunCellDivide(bool updateperiodic){
   }
   TmcStop(Timers,TMC_NlOutCheck);
   BoundChanged=false;
+	if(updateperiodic && PeriActive){
+		delete[] SlipVel; SlipVel=NULL;
+		SlipVel=new tfloat3[Npb];
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -498,7 +503,7 @@ void JSphCpuSingle::Interaction_Forces(TpInter tinter){
   const char met[]="Interaction_Forces";
   PreInteraction_Forces(tinter);
   TmcStart(Timers,TMC_CfForces);
-	
+	if(tinter==INTER_Forces) memset(SlipVel,0,sizeof(tfloat3)*Npb);
   //-Interaction of Fluid-Fluid/Bound & Bound-Fluid (forces and DEM) / Interaccion Fluid-Fluid/Bound & Bound-Fluid (forces and DEM).
   float viscdt=0;
   if(Psimple)JSphCpu::InteractionSimple_Forces(Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellc,PsPosc,Velrhopc,Idpc,Codec,Pressc,viscdt,Arc,Acec,Deltac,SpsTauc,SpsGradvelc,ShiftPosc,ShiftDetectc);
@@ -615,7 +620,7 @@ double JSphCpuSingle::ComputeStep_Sym(){
   //-Predictor
   //-----------
   DemDtForce=dt*0.5f;                     //(DEM)
-	Interaction_Forces(INTER_Forces);       //-Interaction / Interaccion
+	Interaction_Forces(INTER_Forces);      //-Interaction / Interaccion
   const double ddt_p=DtVariable(false);   //-Calculate dt of predictor step / Calcula dt del predictor
   if(TShifting)RunShifting(dt*.5);        //-Shifting
   ComputeSymplecticPre(dt);               //-Apply Symplectic-Predictor to particles / Aplica Symplectic-Predictor a las particulas
