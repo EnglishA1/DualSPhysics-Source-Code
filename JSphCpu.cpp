@@ -827,6 +827,11 @@ void JSphCpu::NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp
 	nx=SignHunter(-xd);
 	ny=SignHunter(-yd);
 	nz=SignHunter(-zd);
+
+	float Norm = sqrt(nx*nx + ny*ny + nz*nz);
+	nx = nx/Norm;
+	ny = ny/Norm;
+	nz = nz/Norm;
 }
 
 //==============================================================================                        SHABA
@@ -906,34 +911,6 @@ unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)
 	return Bound;
 }
 
-//================================================================================
-// Function to find the furthest particle behind the particle on the physical boundary
-// Returns the particle number
-//================================================================================
-void JSphCpu::FullBackFinder(unsigned p1, unsigned &HalfPenny, const tdouble3 *pos, float nx, float ny, float nz)const
-{
-
-	tdouble3 posBound = pos[p1];
-	tdouble3 Hogg;
-	Hogg.x = posBound.x - nx*6.5*Dp;
-	Hogg.y = posBound.y - ny*6.5*Dp;
-	Hogg.z = posBound.z - nz*6.5*Dp;
-
-	double distance=10;
-	for(unsigned p2=0;p2<Npb;p2++){
-		double dx=pos[p2].x-Hogg.x;
-		double dy=pos[p2].y-Hogg.y;
-		double dz=pos[p2].z-Hogg.z;
-
-		double radius=sqrt(dx*dx + dy*dy + dz*dz);
-		if(radius<=distance){
-			distance=radius;
-			HalfPenny = p2;			
-		}
-	}
-
-}
-
 //================================================================================                                    SHABA
 // Function to find the partilces on the physical boundary, find the normals to the boundary 
 // and calculate the partial slip velocity at these boundary particles
@@ -943,25 +920,21 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 	unsigned Bound = IsBound(p1, pos, idp);
 
 	float nx=0, ny=0, nz=0;
-	unsigned HalfPenny=0;
 
 	if(Bound == p1)
 	{
 		NormalHunter(p1, pos, idp, nx, ny, nz);
 		VelocityGradient(p1, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b);
-		FullBackFinder(p1, HalfPenny, pos, nx, ny, nz);
 	}
 	else
 	{
 		SlipVelx=0;
 		SlipVely=0;
 		SlipVelz=0;
-		
 	}
-	
-	velrhop[HalfPenny].x += SlipVelx;
-	velrhop[HalfPenny].y += SlipVely;
-	velrhop[HalfPenny].z += SlipVelz;
+	SlipVel[p1].x = SlipVelx;
+	SlipVel[p1].y = SlipVely;
+	SlipVel[p1].z = SlipVelz;
 }
 
 //==============================================================================
@@ -993,40 +966,38 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
   ,float &viscdt,float *ar)const
 {
+	// Partial Slip Calculations
 	float b=0.01f; // SLIP LENGTH
-	float SlipVelx=0, SlipVely=0, SlipVelz=0;
-
-
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
 	{
+		float SlipVelx=0, SlipVely=0, SlipVelz=0;
 		PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b);
 	}
 
 	for (unsigned p1=0;p1<Npb;p1++) // assigning particles partial slip velocities
 	{
-		float nx=0,ny=0,nz=0;
-		unsigned HalfPenny=0;
-		NormalHunter(p1, pos, idp, nx, ny, nz);
-		VelocityGradient(p1, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b);
-		FullBackFinder(p1, HalfPenny, pos, nx, ny, nz);
+		unsigned Bound = IsBound(p1, pos, idp);
+		SlipVel[p1].x = SlipVel[Bound].x;
+		SlipVel[p1].y = SlipVel[Bound].y;
+		SlipVel[p1].z = SlipVel[Bound].z;
 
-		velrhop[p1].x =  velrhop[HalfPenny].x;
-		velrhop[p1].y = 0.0f; //velrhop[HalfPenny].y;
-		velrhop[p1].z = 0.0f;//velrhop[HalfPenny].z;
+		velrhop[p1].x = SlipVel[p1].x;
+		velrhop[p1].y = SlipVel[p1].y;
+		velrhop[p1].z = SlipVel[p1].z;
 	}
 	
 	//periodic particle loop
-	for(unsigned p1=0;p1<Npb;p1++){
-
+	for(unsigned p1=0;p1<Npb;p1++)
+	{
 		bool PerryCox = false;
 		PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
-		if(PerryCox){
-		unsigned PartID = idp[p1];
-		unsigned p2 = Bouncer(PartID, code, idp);
-		velrhop[p1].x = velrhop[p2].x;
-		velrhop[p1].y = velrhop[p2].y;
-		velrhop[p1].z = velrhop[p2].z;
-		
+		if(PerryCox)
+		{
+			unsigned PartID = idp[p1];
+			unsigned p2 = Bouncer(PartID, code, idp);
+			velrhop[p1].x = velrhop[p2].x;
+			velrhop[p1].y = velrhop[p2].y;
+			velrhop[p1].z = velrhop[p2].z;
 		}
 	}
 
