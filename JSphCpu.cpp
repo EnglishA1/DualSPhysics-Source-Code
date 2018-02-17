@@ -819,14 +819,18 @@ void JSphCpu::NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp
 	unsigned partfluid = Idpc[fluid];
 	unsigned partbound = Idpc[boundary];
 
-	double xd=boundary3.x-fluid3.x;
-	double yd=boundary3.y-fluid3.y;
-	double zd=boundary3.z-fluid3.z;
+	double xd=fluid3.x-boundary3.x;
+	if(sqrt(xd*xd)<Dp/2) xd = 0.0;
+	double yd=fluid3.y-boundary3.y;
+	if(sqrt(yd*yd)<Dp/2) yd = 0.0;
+	double zd=fluid3.z-boundary3.z;
+	if(sqrt(zd*zd)<Dp/2) zd = 0.0;
+
 
 	// using the negative differances to have the normal pointing into the fluid
-	nx=SignHunter(-xd);
-	ny=SignHunter(-yd);
-	nz=SignHunter(-zd);
+	nx=SignHunter(xd);
+	ny=SignHunter(yd);
+	nz=SignHunter(zd);
 
 	float Norm = sqrt(nx*nx + ny*ny + nz*nz);
 	nx = nx/Norm;
@@ -855,50 +859,112 @@ float JSphCpu::SignHunter(double number)const
 // Function to calculate the velocity gradient used in the Partial slip boundary 
 // condition summing over all surrounding fluid and boundary particles
 //===============================================================================
-void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, double nx, double ny, double nz, float b)const
+void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
+	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
 {
-
+	
+					//		cout << p1 << "\t" <<  pos[p1].x << "\t" <<  pos[p1].y << "\t" <<  pos[p1].z << endl;
+	
 	float ux=0, uy=0, uz=0;
 	float vx=0, vy=0, vz=0;
 	float wx=0, wy=0, wz=0;
-	for( unsigned p2=0; p2<Np;p2++)
-	{
-		const float drx=float(pos[p1].x-pos[p2].x);
-    const float dry=float(pos[p1].y-pos[p2].y);
-    const float drz=float(pos[p1].z-pos[p2].z);
-    const float rr2=drx*drx+dry*dry+drz*drz;
-			if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
-				if(Idpc[p1]==95){
-					cout << p1 << "\t" <<  pos[p1].x << "\t" <<  pos[p1].y << "\t" <<  pos[p1].z << endl;
-					cout << p2 << "\t" <<  pos[p2].x << "\t" <<  pos[p2].y << "\t" <<  pos[p2].z << endl;
-				}
-      float frx,fry,frz;
-			GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
-			float m2=MassFluid;
-			float uij = float(velrhop[p1].x - velrhop[p2].x);
-			float vij = float(velrhop[p1].y - velrhop[p2].y);
-			float wij = float(velrhop[p1].z - velrhop[p2].z);
+	 //-Obtain limits of interaction / Obtiene limites de interaccion
+  int cxini,cxfin,yini,yfin,zini,zfin;
+  GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
 
-			ux+=-(m2/velrhop[p2].w)*uij*(drx/rr2)*frx;
-			uy+=-(m2/velrhop[p2].w)*uij*(dry/rr2)*fry;
-			uz+=-(m2/velrhop[p2].w)*uij*(drz/rr2)*frz;
+  //-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
+  for(int z=zini;z<zfin;z++){
+    const int zmod=(nc.w)*z+cellinitial; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
+    for(int y=yini;y<yfin;y++){
+      int ymod=zmod+nc.x*y;
+      const unsigned pini=beginendcell[cxini+ymod];
+      const unsigned pfin=beginendcell[cxfin+ymod];
+	
+			for( unsigned p2=pini; p2<pfin;p2++)
+			{
+				const float drx=float(pos[p1].x-pos[p2].x);
+				const float dry=float(pos[p1].y-pos[p2].y);
+				const float drz=float(pos[p1].z-pos[p2].z);
+				const float rr2=drx*drx+dry*dry+drz*drz;
+					if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+						
+							//cout << " First loop" << endl;
+							//cout << p2 << "\t" <<  pos[p2].x << "\t" <<  pos[p2].y << "\t" <<  pos[p2].z << endl;
+						
+					float frx,fry,frz;
+					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
+					float m2=MassFluid;
+					float uij = float(velrhop[p1].x - velrhop[p2].x);
+					float vij = float(velrhop[p1].y - velrhop[p2].y);
+					float wij = float(velrhop[p1].z - velrhop[p2].z);
 
-			vx+=-(m2/velrhop[p2].w)*vij*(drx/rr2)*frx;
-			vy+=-(m2/velrhop[p2].w)*vij*(dry/rr2)*fry;
-			vz+=-(m2/velrhop[p2].w)*vij*(drz/rr2)*frz;
+					ux+=-(m2/velrhop[p2].w)*uij*(drx/rr2)*frx;
+					uy+=-(m2/velrhop[p2].w)*uij*(dry/rr2)*fry;
+					uz+=-(m2/velrhop[p2].w)*uij*(drz/rr2)*frz;
 
-			wx+=-(m2/velrhop[p2].w)*wij*(drx/rr2)*frx;
-			wy+=-(m2/velrhop[p2].w)*wij*(dry/rr2)*fry;
-			wz+=-(m2/velrhop[p2].w)*wij*(drz/rr2)*frz;
+					vx+=-(m2/velrhop[p2].w)*vij*(drx/rr2)*frx;
+					vy+=-(m2/velrhop[p2].w)*vij*(dry/rr2)*fry;
+					vz+=-(m2/velrhop[p2].w)*vij*(drz/rr2)*frz;
+
+					wx+=-(m2/velrhop[p2].w)*wij*(drx/rr2)*frx;
+					wy+=-(m2/velrhop[p2].w)*wij*(dry/rr2)*fry;
+					wz+=-(m2/velrhop[p2].w)*wij*(drz/rr2)*frz;
 
 			
-				//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
+						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
+					}
 			}
+		}
 	}
 
+	//-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
+  for(int z=zini;z<zfin;z++){
+    const int zmod=(nc.w)*z+0; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
+    for(int y=yini;y<yfin;y++){
+      int ymod=zmod+nc.x*y;
+      const unsigned pini=beginendcell[cxini+ymod];
+      const unsigned pfin=beginendcell[cxfin+ymod];
+	
+			for( unsigned p2=pini; p2<pfin;p2++)
+			{
+				const float drx=float(pos[p1].x-pos[p2].x);
+				const float dry=float(pos[p1].y-pos[p2].y);
+				const float drz=float(pos[p1].z-pos[p2].z);
+				const float rr2=drx*drx+dry*dry+drz*drz;
+					if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+						
+						//	cout << "Second loop" << endl;
+						//	cout << p2 << "\t" <<  pos[p2].x << "\t" <<  pos[p2].y << "\t" <<  pos[p2].z << endl;
+						
+					float frx,fry,frz;
+					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
+					float m2=MassFluid;
+					float uij = float(velrhop[p1].x - velrhop[p2].x);
+					float vij = float(velrhop[p1].y - velrhop[p2].y);
+					float wij = float(velrhop[p1].z - velrhop[p2].z);
+
+					ux+=-(m2/velrhop[p2].w)*uij*(drx/rr2)*frx;
+					uy+=-(m2/velrhop[p2].w)*uij*(dry/rr2)*fry;
+					uz+=-(m2/velrhop[p2].w)*uij*(drz/rr2)*frz;
+
+					vx+=-(m2/velrhop[p2].w)*vij*(drx/rr2)*frx;
+					vy+=-(m2/velrhop[p2].w)*vij*(dry/rr2)*fry;
+					vz+=-(m2/velrhop[p2].w)*vij*(drz/rr2)*frz;
+
+					wx+=-(m2/velrhop[p2].w)*wij*(drx/rr2)*frx;
+					wy+=-(m2/velrhop[p2].w)*wij*(dry/rr2)*fry;
+					wz+=-(m2/velrhop[p2].w)*wij*(drz/rr2)*frz;
+
+			
+						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
+					}
+			}
+		}
+	}
+	nz=-1.0f;
 	SlipVelx = b*((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
-	SlipVely =0;//= b*((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
-	SlipVelz =0;//= b*((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
+	SlipVely = b*((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
+	SlipVelz = b*((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
 }
 
 //================================================================================
@@ -919,25 +985,18 @@ unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)
 // Function to find the partilces on the physical boundary, find the normals to the boundary 
 // and calculate the partial slip velocity at these boundary particles
 //================================================================================
-void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float b)const
+void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float b
+	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
 {
 	unsigned Bound = IsBound(p1, pos, idp);
 
-	double nx=0, ny=0, nz=0;
+	float nx=0, ny=0, nz=0;
+	//cout << p1 << endl;
 
-	if(Bound == p1)
-	{
-		//NormalHunter(p1, pos, idp, nx, ny, nz);
-		if (Posc[p1].z<0)nz=1.0;
-		if (Posc[p1].z>0)nz=-1.0;
-		VelocityGradient(p1, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b);
-	}
-	else
-	{
-		SlipVelx=0;
-		SlipVely=0;
-		SlipVelz=0;
-	}
+	NormalHunter(p1, pos, idp, nx, ny, nz);
+	VelocityGradient(Bound, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
+
+	
 	SlipVel[p1].x = SlipVelx;
 	SlipVel[p1].y = SlipVely;
 	SlipVel[p1].z = SlipVelz;
@@ -973,18 +1032,17 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   ,float &viscdt,float *ar)const
 {
 	// Partial Slip Calculations
-	float b=0.01f; // SLIP LENGTH
+	float b=0.001f; // SLIP LENGTH
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
 	{
-		
 			float SlipVelx=0, SlipVely=0, SlipVelz=0;
-			PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b);
+			PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
 		
 	}
 
 	for (unsigned p1=0;p1<Npb;p1++) // assigning particles partial slip velocities
 	{
-		//unsigned Bound = IsBound(p1, pos, idp);
+		
 		velrhop[p1].x = SlipVel[p1].x;
 		velrhop[p1].y = SlipVel[p1].y;
 		velrhop[p1].z = SlipVel[p1].z;
