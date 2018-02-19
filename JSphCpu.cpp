@@ -898,17 +898,17 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 					float vij = float(velrhop[p1].y - velrhop[p2].y);
 					float wij = float(velrhop[p1].z - velrhop[p2].z);
 
-					ux+=-(m2/velrhop[p2].w)*uij*(drx/rr2)*frx;
-					uy+=-(m2/velrhop[p2].w)*uij*(dry/rr2)*fry;
-					uz+=-(m2/velrhop[p2].w)*uij*(drz/rr2)*frz;
+					ux+=-(m2/velrhop[p2].w)*uij*frx;
+					uy+=-(m2/velrhop[p2].w)*uij*fry;
+					uz+=-(m2/velrhop[p2].w)*uij*frz;
 
-					vx+=-(m2/velrhop[p2].w)*vij*(drx/rr2)*frx;
-					vy+=-(m2/velrhop[p2].w)*vij*(dry/rr2)*fry;
-					vz+=-(m2/velrhop[p2].w)*vij*(drz/rr2)*frz;
+					vx+=-(m2/velrhop[p2].w)*vij*frx;
+					vy+=-(m2/velrhop[p2].w)*vij*fry;
+					vz+=-(m2/velrhop[p2].w)*vij*frz;
 
-					wx+=-(m2/velrhop[p2].w)*wij*(drx/rr2)*frx;
-					wy+=-(m2/velrhop[p2].w)*wij*(dry/rr2)*fry;
-					wz+=-(m2/velrhop[p2].w)*wij*(drz/rr2)*frz;
+					wx+=-(m2/velrhop[p2].w)*wij*frx;
+					wy+=-(m2/velrhop[p2].w)*wij*fry;
+					wz+=-(m2/velrhop[p2].w)*wij*frz;
 
 			
 						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
@@ -918,7 +918,7 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 	}
 
 	//-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
-  for(int z=zini;z<zfin;z++){
+	for(int z=zini;z<zfin;z++){
     const int zmod=(nc.w)*z+0; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
     for(int y=yini;y<yfin;y++){
       int ymod=zmod+nc.x*y;
@@ -943,17 +943,17 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 					float vij = float(velrhop[p1].y - velrhop[p2].y);
 					float wij = float(velrhop[p1].z - velrhop[p2].z);
 
-					ux+=-(m2/velrhop[p2].w)*uij*(drx/rr2)*frx;
-					uy+=-(m2/velrhop[p2].w)*uij*(dry/rr2)*fry;
-					uz+=-(m2/velrhop[p2].w)*uij*(drz/rr2)*frz;
+					ux+=-(m2/velrhop[p2].w)*uij*frx;
+					uy+=-(m2/velrhop[p2].w)*uij*fry;
+					uz+=-(m2/velrhop[p2].w)*uij*frz;
 
-					vx+=-(m2/velrhop[p2].w)*vij*(drx/rr2)*frx;
-					vy+=-(m2/velrhop[p2].w)*vij*(dry/rr2)*fry;
-					vz+=-(m2/velrhop[p2].w)*vij*(drz/rr2)*frz;
+					vx+=-(m2/velrhop[p2].w)*vij*frx;
+					vy+=-(m2/velrhop[p2].w)*vij*fry;
+					vz+=-(m2/velrhop[p2].w)*vij*frz;
 
-					wx+=-(m2/velrhop[p2].w)*wij*(drx/rr2)*frx;
-					wy+=-(m2/velrhop[p2].w)*wij*(dry/rr2)*fry;
-					wz+=-(m2/velrhop[p2].w)*wij*(drz/rr2)*frz;
+					wx+=-(m2/velrhop[p2].w)*wij*frx;
+					wy+=-(m2/velrhop[p2].w)*wij*fry;
+					wz+=-(m2/velrhop[p2].w)*wij*frz;
 
 			
 						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
@@ -961,10 +961,10 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 			}
 		}
 	}
-	nz=-1.0f;
-	SlipVelx = b*((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
-	SlipVely = b*((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
-	SlipVelz = b*((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
+	
+	SlipVelx = ((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
+	SlipVely = ((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
+	SlipVelz = ((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
 }
 
 //================================================================================
@@ -997,9 +997,9 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 	VelocityGradient(Bound, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
 
 	
-	SlipVel[p1].x = SlipVelx;
-	SlipVel[p1].y = SlipVely;
-	SlipVel[p1].z = SlipVelz;
+	SlipVel[p1].x = b*SlipVelx;
+	SlipVel[p1].y = b*SlipVely;
+	SlipVel[p1].z = b*SlipVelz;
 }
 
 //==============================================================================
@@ -1032,7 +1032,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   ,float &viscdt,float *ar)const
 {
 	// Partial Slip Calculations
-	float b=0.001f; // SLIP LENGTH
+	float b=0.01f; // SLIP LENGTH
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
 	{
 			float SlipVelx=0, SlipVely=0, SlipVelz=0;
