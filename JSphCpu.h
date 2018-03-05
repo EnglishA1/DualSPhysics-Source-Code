@@ -168,6 +168,40 @@ protected:
     ,int hdiv,const tint4 &nc,const tint3 &cellzero
     ,int &cxini,int &cxfin,int &yini,int &yfin,int &zini,int &zfin)const;
 
+	//==========================================================                                                             SHABA
+	// Marrone Boundary additions
+	//==========================================================
+
+	unsigned FluidHunter(unsigned p1, tdouble3 *pos, unsigned *idp)const;
+
+	unsigned BoundaryHunter(unsigned Fluid, tdouble3 *pos, unsigned *idp)const;
+
+	void DistBound(unsigned p1, tdouble3 *pos, unsigned *idp, float &dx, float &dy, float &dz)const;
+
+	void NormalHunter(unsigned p1, tdouble3 *pos, unsigned *idp, float &nx, float &ny, float &nz)const;
+
+	float SignHunter(float number)const;
+
+	void MarroneDuplicatePos(unsigned p1,tdouble3 *pos,  unsigned *idp, tdouble3 &posMar)const;
+
+	void MarroneMatrixElements(float xij, float yij, float zij, unsigned Marr, unsigned p2,  tfloat4 *velrhop,
+	float &a11, float &a12, float &a13, float &a14, float &a22, float &a23, float &a24, float &a33, float &a34, float &a44
+	)const;
+
+	float MLSDet3(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44)const;
+
+	float MLSDet4(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44)const;
+
+	void MLSElements3(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44, float &b11, float &b21, float &b31, float &b41)const;
+
+	void MLSElements4(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44, float &b11, float &b21, float &b31, float &b41)const;
+
+	void InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velrhop, unsigned *idp, 
+	float *press, const word *code
+	)const;
+
+	//==========================================================
+
   template<bool psimple,TpKernel tker,TpFtMode ftmode> void InteractionForcesBound
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellinitial
     ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
