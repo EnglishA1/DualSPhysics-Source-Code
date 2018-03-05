@@ -705,6 +705,22 @@ float JSphCpu::GetKernelCubicTensil(float rr2,float rhopp1,float pressp1,float r
 }
 
 //==============================================================================
+/// Devuelve valores de kernel Wendland, gradients: frx, fry y frz.
+/// Return values of kernel Wendland: frx, fry and frz.                                                                                SHABA
+//==============================================================================
+float JSphCpu::GetKernelWab(float xij, float yij, float zij)const{
+  const float rr=xij*xij+yij*yij+zij*zij;
+	const float rad=sqrt(rr);
+  const float qq=rad/H;
+  //-Wendland kernel
+  const float wqq1=1.f-0.5f*qq;
+	const float wqq2=2.f*qq+1.f;
+  const float fac=Awen*wqq1*wqq1*wqq1*wqq1*wqq2;
+ 
+	return(fac);
+}
+
+//==============================================================================
 /// Devuelve limites de celdas para interaccion.
 /// Return cell limits for interaction.
 //==============================================================================
@@ -1106,8 +1122,8 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionForcesBound
   (unsigned n,unsigned pinit,tint4 nc,int hdiv,unsigned cellinitial
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
-  ,float &viscdt,float *ar)const
+  ,tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code, unsigned *idp
+  ,float *press,float &viscdt,float *ar)const
 {
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[MAXTHREADS_OMP*STRIDE_OMP];
@@ -1119,6 +1135,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   #endif
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0;
+
+		// Marrone Particle calculations                       SHABA
+		InteractionForcesMarrone(p1, pos, velrhop, idp, press, code);
 
     //-Load data of particle p1 / Carga datos de particula p1.
     const tfloat3 velp1=TFloat3(velrhop[p1].x,velrhop[p1].y,velrhop[p1].z);
@@ -1522,8 +1541,8 @@ void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,cons
 template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void JSphCpu::Interaction_ForcesT
   (unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
-  ,const float *press
+  ,tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code, unsigned *idp
+  ,float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1534,6 +1553,12 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   const unsigned cellfluid=nc.w*nc.z+1;
   const int hdiv=(CellMode==CELLMODE_H? 2: 1);
   
+	// Changed the order of interaction and the particles it sums over to npb rather than npbok
+	if(npb){
+    //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
+    InteractionForcesBound      <psimple,tker,ftmode> (npb,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar);
+  }
+
   if(npf){
     //-Interaction Fluid-Fluid / Interaccion Fluid-Fluid
     InteractionForcesFluid<psimple,tker,ftmode,lamsps,tdelta,shift> (npf,npb,nc,hdiv,cellfluid,Visco                 ,begincell,cellzero,dcell,spstau,spsgradvel,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,tshifting,shiftpos,shiftdetect);
@@ -1546,10 +1571,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
     //-Computes tau for Laminar+SPS.
     if(lamsps)ComputeSpsTau(npf,npb,velrhop,spsgradvel,spstau);
   }
-  if(npbok){
-    //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
-    InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,viscdt,ar);
-  }
+  
 }
 
 //==============================================================================
@@ -1558,8 +1580,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 //==============================================================================
 void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat4 *velrhop,const unsigned *idp,const word *code
-  ,const float *press
+  ,tdouble3 *pos,tfloat4 *velrhop, unsigned *idp,const word *code
+  ,float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1711,8 +1733,8 @@ void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
 //==============================================================================
 void JSphCpu::InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tfloat3 *pspos,const tfloat4 *velrhop,const unsigned *idp,const word *code
-  ,const float *press
+  ,const tfloat3 *pspos,tfloat4 *velrhop, unsigned *idp,const word *code
+  ,float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,tfloat3 *shiftpos,float *shiftdetect)const

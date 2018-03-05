@@ -160,7 +160,7 @@ protected:
   void PosInteraction_Forces();
 
   inline void GetKernel(float rr2,float drx,float dry,float drz,float &frx,float &fry,float &frz)const;
-	inline float GetKernelWab(float rr2)const;
+	inline float GetKernelWab(float xij, float yij, float zij)const; //                                                     SHABA
   inline void GetKernelCubic(float rr2,float drx,float dry,float drz,float &frx,float &fry,float &frz)const;
   inline float GetKernelCubicTensil(float rr2,float rhopp1,float pressp1,float rhopp2,float pressp2)const;
 
@@ -205,8 +205,8 @@ protected:
   template<bool psimple,TpKernel tker,TpFtMode ftmode> void InteractionForcesBound
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellinitial
     ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
-    ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhopp,const word *code,const unsigned *id
-    ,float &viscdt,float *ar)const;
+    ,tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhopp,const word *code, unsigned *id
+    ,float *press,float &viscdt,float *ar)const;
 
   template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void InteractionForcesFluid
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellfluid,float visco
@@ -227,24 +227,24 @@ protected:
   template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void Interaction_ForcesT
     (unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-    ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
-    ,const float *press
+    ,tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code, unsigned *idp
+    ,float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
     ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const;
 
   void Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-    ,const tdouble3 *pos,const tfloat4 *velrhop,const unsigned *idp,const word *code
-    ,const float *press
+    ,tdouble3 *pos,tfloat4 *velrhop, unsigned *idp,const word *code
+    ,float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
     ,tfloat3 *shiftpos,float *shiftdetect)const;
 
   void InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-    ,const tfloat3 *pspos,const tfloat4 *velrhop,const unsigned *idp,const word *code
-    ,const float *press
+    ,const tfloat3 *pspos,tfloat4 *velrhop, unsigned *idp,const word *code
+    ,float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
     ,tfloat3 *shiftpos,float *shiftdetect)const;
