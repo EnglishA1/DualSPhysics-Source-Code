@@ -468,7 +468,7 @@ void JSphCpuSingle::RunCellDivide(bool updateperiodic){
   }
   TmcStop(Timers,TMC_NlOutCheck);
   BoundChanged=false;
-	if(updateperiodic && PeriActive){
+	if(updateperiodic && PeriActive){ // SHABA
 		delete[] SlipVel; SlipVel=NULL;
 		SlipVel=new tfloat3[Npb];
 	}
@@ -503,7 +503,7 @@ void JSphCpuSingle::Interaction_Forces(TpInter tinter){
   const char met[]="Interaction_Forces";
   PreInteraction_Forces(tinter);
   TmcStart(Timers,TMC_CfForces);
-	if(tinter==INTER_Forces) memset(SlipVel,0,sizeof(tfloat3)*Npb);
+	if(tinter==INTER_Forces) memset(SlipVel,0,sizeof(tfloat3)*Npb); // SHABA
   //-Interaction of Fluid-Fluid/Bound & Bound-Fluid (forces and DEM) / Interaccion Fluid-Fluid/Bound & Bound-Fluid (forces and DEM).
   float viscdt=0;
   if(Psimple)JSphCpu::InteractionSimple_Forces(Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellc,PsPosc,Velrhopc,Idpc,Codec,Pressc,viscdt,Arc,Acec,Deltac,SpsTauc,SpsGradvelc,ShiftPosc,ShiftDetectc);
