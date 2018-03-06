@@ -834,6 +834,10 @@ void JSphCpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
   TmcResetValues(Timers);
   TmcStop(Timers,TMC_Init);
   PartNstep=-1; Part++;
+	// setting the particles density to the reference density RhopZero        SHABA
+	for(unsigned p=0;p<Np;p++){
+		Velrhopc[p].w = RhopZero;
+	}
 
   //-Main Loop / Bucle principal
   //------------------

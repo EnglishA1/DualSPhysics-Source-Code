@@ -725,6 +725,89 @@ void JSphCpu::GetInteractionCells(unsigned rcell
   zfin=cz+min(nc.z-cz-1,hdiv)+1;
 }
 
+//==============================================================================                                       SHABA
+/// Kernel summation for the Wendland kernal to be used in Shepard filtering
+/// or Adami boundaries. Returns the summation element fac                      
+//==============================================================================
+float JSphCpu::GetKernelWab(float rr2,float drx,float dry,float drz)const{
+  const float rr=drx*drx+dry*dry+drz*drz;
+	const float rad=sqrt(rr);
+  const float qq=rad/H;
+  //-Wendland kernel
+  const float wqq1=1.f-0.5f*qq;
+	const float wqq2=2.f*qq+1.f;
+  const float fac=Awen*wqq1*wqq1*wqq1*wqq1*wqq2;
+ 
+	return(fac);
+}
+
+//==============================================================================                                            SHABA
+// Function to calculate the velocities, pressure and density of a boundary particle
+// using the Adami boundary method. This will be slow and could very probably be sped up
+//==============================================================================
+void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, float *press, float &Adamix, float &Adamiy, float &Adamiz, float &AdamiPress, float &AdamiRhop)const
+{
+
+	tdouble3 PosBound = pos[p2];
+	float kernel=0;
+	float presx=0,presy=0,presz=0;
+	//cout << pos[p2].x << "\t" << pos[p2].y << "\t" << pos[p2].z << endl;
+
+	for(unsigned p1=Npb;p1<Np;p1++){
+          const float drx=float(PosBound.x-pos[p1].x);
+          const float dry=float(PosBound.y-pos[p1].y);
+          const float drz=float(PosBound.z-pos[p1].z);
+          const float rr2=drx*drx+dry*dry+drz*drz;
+          if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+						kernel += GetKernelWab(rr2, drx, dry, drz);
+
+						Adamix += velrhop[p1].x*GetKernelWab(rr2, drx, dry, drz);
+						Adamiy += velrhop[p1].y*GetKernelWab(rr2, drx, dry, drz);
+						Adamiz += velrhop[p1].z*GetKernelWab(rr2, drx, dry, drz);
+
+						AdamiPress += press[p1]*GetKernelWab(rr2, drx, dry, drz);
+						presx += velrhop[p1].w*drx*GetKernelWab(rr2, drx, dry, drz);
+						presy += velrhop[p1].w*dry*GetKernelWab(rr2, drx, dry, drz);
+						presz += velrhop[p1].w*drz*GetKernelWab(rr2, drx, dry, drz);
+
+					}
+	}
+	Adamix = -Adamix/kernel;
+	Adamiy = -Adamiy/kernel;
+	Adamiz = -Adamiz/kernel;
+
+	AdamiPress = (AdamiPress +Gravity.x*presx + Gravity.y*presy + Gravity.z*presz)/kernel;
+
+	float bracket = (AdamiPress)/CteB + 1.0f;
+	AdamiRhop = RhopZero*(pow(bracket,1/Gamma));
+
+	if(kernel ==0)
+	{
+		AdamiRhop = RhopZero;
+	}
+
+		
+}
+
+//==============================================================================
+// function to find the non-periodic particle associated to a particle id (idp)
+//==============================================================================
+unsigned JSphCpu::Bouncer(unsigned PartID, const word *code, const unsigned *idp) const
+{
+	unsigned Particle=0;
+	for(unsigned p=0;p<Np;p++)
+	{
+		bool PerryCox=(CODE_GetTypeValue(code[p])==CODE_PERIODIC);
+		if(idp[p]==PartID){
+			if(!PerryCox){
+				Particle = p;
+			}
+		}
+
+	}
+	return(Particle);
+}
+
 //==============================================================================
 /// Realiza interaccion entre particulas. Bound-Fluid/Float
 /// Perform interaction between particles. Bound-Fluid/Float
@@ -732,8 +815,9 @@ void JSphCpu::GetInteractionCells(unsigned rcell
 template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionForcesBound
   (unsigned n,unsigned pinit,tint4 nc,int hdiv,unsigned cellinitial
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
-  ,float &viscdt,float *ar)const
+  ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
+	,float *press
+  ,float &viscdt,float *ar)const            // ^  changed to float for the global velocity     SHABA
 {
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[MAXTHREADS_OMP*STRIDE_OMP];
@@ -743,14 +827,26 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   #ifdef _WITHOMP
     #pragma omp parallel for schedule (guided)
   #endif
+	// non periodic particle loop
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0;
 
-    //-Load data of particle p1 / Carga datos de particula p1.
-    const tfloat3 velp1=TFloat3(velrhop[p1].x,velrhop[p1].y,velrhop[p1].z);
+    /*//-Load data of particle p1 / Carga datos de particula p1.
+    tfloat3 velp1=TFloat3(velrhop[p1].x,velrhop[p1].y,velrhop[p1].z);
     const tfloat3 psposp1=(psimple? pspos[p1]: TFloat3(0));
-    const tdouble3 posp1=(psimple? TDouble3(0): pos[p1]);
+    const tdouble3 posp1=(psimple? TDouble3(0): pos[p1]);*/
 
+		bool PerryCox = false;
+		PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
+		if(!PerryCox){
+		// defining the Adami parameters and doing the calculation if p2 is a boundary particle
+		float Adamix=0, Adamiy=0, Adamiz=0, AdamiPress=0, AdamiRhop=0;
+		AdamiCalc(p1,pos,velrhop,press,Adamix,Adamiy,Adamiz,AdamiPress,AdamiRhop);	
+		velrhop[p1].w = AdamiRhop;
+		press[p1] = AdamiPress;
+		}
+	}
+/*
     //-Obtain limits of interaction / Obtiene limites de interaccion
     int cxini,cxfin,yini,yfin,zini,zfin;
     GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
@@ -763,9 +859,14 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
         const unsigned pini=beginendcell[cxini+ymod];
         const unsigned pfin=beginendcell[cxfin+ymod];
 
+				// defining the Adami parameters and doing the calculation if p2 is a boundary particle
+						float Adamix=0, Adamiy=0, Adamiz=0, AdamiPress=0, AdamiRhop=0;
+						AdamiCalc(p1,pos,velrhop,press,Adamix,Adamiy,Adamiz,AdamiPress,AdamiRhop);	
+						velrhop[p1].w = AdamiRhop;
+
         //-Interaction of boundary with type Fluid/Float / Interaccion de Bound con varias Fluid/Float.
         //----------------------------------------------
-        for(unsigned p2=pini;p2<pfin;p2++){
+       for(unsigned p2=pini;p2<pfin;p2++){
           const float drx=(psimple? psposp1.x-pspos[p2].x: float(posp1.x-pos[p2].x));
           const float dry=(psimple? psposp1.y-pspos[p2].y: float(posp1.y-pos[p2].y));
           const float drz=(psimple? psposp1.z-pspos[p2].z: float(posp1.z-pos[p2].z));
@@ -787,8 +888,15 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 
             if(compute){
               //-Density derivative
-              const float dvx=velp1.x-velrhop[p2].x, dvy=velp1.y-velrhop[p2].y, dvz=velp1.z-velrhop[p2].z;
+              float dvx=velp1.x-velrhop[p2].x, dvy=velp1.y-velrhop[p2].y, dvz=velp1.z-velrhop[p2].z;
               if(compute)arp1+=massp2*(dvx*frx+dvy*fry+dvz*frz);
+
+							// assigning the Adami properties to the boundaries
+							velp1.x = Adamix;
+							velp1.y = Adamiy;
+							velp1.z = Adamiz;
+							
+							dvx=velp1.x-velrhop[p2].x, dvy=velp1.y-velrhop[p2].y, dvz=velp1.z-velrhop[p2].z;
 
               {//===== Viscosity ===== 
                 const float dot=drx*dvx + dry*dvy + drz*dvz;
@@ -805,8 +913,22 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
       ar[p1]+=arp1;
       const int th=omp_get_thread_num();
       if(visc>viscth[th*STRIDE_OMP])viscth[th*STRIDE_OMP]=visc;
-    }
-  }
+    }*/
+  
+	//periodic particle loop
+	for(int p1=int(pinit);p1<pfin;p1++){
+
+		bool PerryCox = false;
+		PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
+		if(PerryCox){
+		unsigned PartID = idp[p1];
+		unsigned p2 = Bouncer(PartID, code, idp);
+		velrhop[p1].w = velrhop[p2].w;
+		press[p1] = press[p2];
+		
+		}
+	}
+
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
   for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
 }
@@ -819,8 +941,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   (unsigned n,unsigned pinit,tint4 nc,int hdiv,unsigned cellinitial,float visco
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
   ,const tsymatrix3f* tau,tsymatrix3f* gradvel
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
-  ,const float *press 
+  ,const tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code,const unsigned *idp
+  ,float *press 
   ,float &viscdt,float *ar,tfloat3 *ace,float *delta
   ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const
 {
@@ -883,6 +1005,24 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
             if(tker==KERNEL_Wendland)GetKernel(rr2,drx,dry,drz,frx,fry,frz);
             else if(tker==KERNEL_Cubic)GetKernelCubic(rr2,drx,dry,drz,frx,fry,frz);
 
+						// defining the Adami parameters and doing the calculation if p2 is a boundary particle
+						float Adamix=0, Adamiy=0, Adamiz=0, AdamiPress=0, AdamiRhop=0;
+						tfloat3 velp2 = TFloat3(velrhop[p2].x,velrhop[p2].y,velrhop[p2].z);
+						float pressp2 = press[p2];
+						float rhopp2  = velrhop[p2].w;
+						if(p2<NpbOk){
+							bool PerryCox = false;
+							PerryCox = (CODE_GetTypeValue(code[p2])==CODE_PERIODIC);
+							if(PerryCox){
+								unsigned PartID = idp[p2];
+								unsigned p3 = Bouncer(PartID, code, idp);
+								AdamiCalc(p3,pos,velrhop,press,Adamix,Adamiy,Adamiz,AdamiPress,AdamiRhop);
+							}
+							else{
+								AdamiCalc(p2,pos,velrhop,press,Adamix,Adamiy,Adamiz,AdamiPress,AdamiRhop);
+							}
+						}
+
             //===== Get mass of particle p2  /  Obtiene masa de particula p2 ===== 
             float massp2=(boundp2? MassBound: MassFluid); //-Contiene masa de particula segun sea bound o fluid.
             bool ftp2=false;    //-Indicate if it is floating / Indica si es floating.
@@ -899,7 +1039,43 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
               compute=!(USE_DEM && ftp1 && (boundp2 || ftp2)); //-Deactivate when using DEM and if it is of type float-float or float-bound / Se desactiva cuando se usa DEM y es float-float o float-bound.
             }
 
-            //===== Acceleration ===== 
+						// Reorder the calculation for Adami particles
+            //-Density derivative
+            float dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
+            if(compute)arp1+=massp2*(dvx*frx+dvy*fry+dvz*frz);
+
+            const float cbar=(float)Cs0;
+            //-Density derivative (DeltaSPH Molteni)
+            if((tdelta==DELTA_Dynamic || tdelta==DELTA_DynamicExt) && deltap1!=FLT_MAX){
+              const float rhop1over2=rhopp1/velrhop[p2].w;
+              const float visc_densi=Delta2H*cbar*(rhop1over2-1.f)/(rr2+Eta2);
+              const float dot3=(drx*frx+dry*fry+drz*frz);
+              const float delta=visc_densi*dot3*massp2;
+              deltap1=(boundp2? FLT_MAX: deltap1+delta);
+            }
+
+						// if p2 is a boundary particle, it it given the Adami properties
+						//position 1
+						if(p2<NpbOk){
+							velp2.x = Adamix;
+							velp2.y = Adamiy;
+							velp2.z = Adamiz;
+
+							//pressp2 = AdamiPress;
+							//rhopp2 = AdamiRhop;
+
+							dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
+						}
+
+						//moved from before the density derivative
+						//===== Acceleration ===== 
+            if(compute){
+              const float prs=(pressp1+pressp2)/(rhopp1*rhopp2) + (tker==KERNEL_Cubic? GetKernelCubicTensil(rr2,rhopp1,pressp1,velrhop[p2].w,press[p2]): 0);
+              const float p_vpm=-prs*massp2*ftmassp1;
+              acep1.x+=p_vpm*frx; acep1.y+=p_vpm*fry; acep1.z+=p_vpm*frz;
+            }
+
+            /*//===== Acceleration ===== 
             if(compute){
               const float prs=(pressp1+press[p2])/(rhopp1*velrhop[p2].w) + (tker==KERNEL_Cubic? GetKernelCubicTensil(rr2,rhopp1,pressp1,velrhop[p2].w,press[p2]): 0);
               const float p_vpm=-prs*massp2*ftmassp1;
@@ -919,7 +1095,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
               const float delta=visc_densi*dot3*massp2;
               deltap1=(boundp2? FLT_MAX: deltap1+delta);
             }
-
+						*/
             //-Shifting correction
             if(shift && shiftposp1.x!=FLT_MAX){
               const float massrhop=massp2/velrhop[p2].w;
@@ -1148,8 +1324,8 @@ void JSphCpu::ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,cons
 template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void JSphCpu::Interaction_ForcesT
   (unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
-  ,const float *press
+  ,const tdouble3 *pos,const tfloat3 *pspos, tfloat4 *velrhop,const word *code,const unsigned *idp
+  , float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1160,6 +1336,12 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   const unsigned cellfluid=nc.w*nc.z+1;
   const int hdiv=(CellMode==CELLMODE_H? 2: 1);
   
+	// changing the order of calculation                SHABA
+	if(npbok){
+			//-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
+			InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar);
+		}
+
   if(npf){
     //-Interaction Fluid-Fluid / Interaccion Fluid-Fluid
     InteractionForcesFluid<psimple,tker,ftmode,lamsps,tdelta,shift> (npf,npb,nc,hdiv,cellfluid,Visco                 ,begincell,cellzero,dcell,spstau,spsgradvel,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,tshifting,shiftpos,shiftdetect);
@@ -1172,10 +1354,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
     //-Computes tau for Laminar+SPS.
     if(lamsps)ComputeSpsTau(npf,npb,velrhop,spsgradvel,spstau);
   }
-  if(npbok){
-    //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
-    InteractionForcesBound      <psimple,tker,ftmode> (npbok,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,viscdt,ar);
-  }
+  
 }
 
 //==============================================================================
@@ -1184,8 +1363,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 //==============================================================================
 void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tdouble3 *pos,const tfloat4 *velrhop,const unsigned *idp,const word *code
-  ,const float *press
+  ,const tdouble3 *pos,tfloat4 *velrhop,const unsigned *idp,const word *code
+  ,float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,tfloat3 *shiftpos,float *shiftdetect)const
@@ -1337,8 +1516,8 @@ void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
 //==============================================================================
 void JSphCpu::InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
   ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
-  ,const tfloat3 *pspos,const tfloat4 *velrhop,const unsigned *idp,const word *code
-  ,const float *press
+  ,const tfloat3 *pspos,tfloat4 *velrhop,const unsigned *idp,const word *code
+  ,float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
   ,tfloat3 *shiftpos,float *shiftdetect)const
