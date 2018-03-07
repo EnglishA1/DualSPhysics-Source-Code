@@ -1232,7 +1232,7 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 
 					vx+=-(m2/velrhop[p2].w)*vij*frx;
 					vy+=-(m2/velrhop[p2].w)*vij*fry;
-					vz+=-(m2/velrhop[p2].w)*vij*frz;
+				  vz+=-(m2/velrhop[p2].w)*vij*frz;
 
 					wx+=-(m2/velrhop[p2].w)*wij*frx;
 					wy+=-(m2/velrhop[p2].w)*wij*fry;
@@ -1378,8 +1378,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 											// This loop calculates the velocity for the marrone boundary particles and gives the boundary particles this velocity
 		
 										velrhop[p1].x += SlipVel[p1].x;
-										velrhop[p1].y += SlipVel[p1].y;
-										velrhop[p1].z += SlipVel[p1].z;
+										//velrhop[p1].y += SlipVel[p1].y;
+										//velrhop[p1].z += SlipVel[p1].z;
 										//   This loop adds the partial slip contribution to the boundary particle in the same way as a wall velocity
 									}
 									
