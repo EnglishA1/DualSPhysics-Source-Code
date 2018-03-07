@@ -467,6 +467,15 @@ void JSphCpuSingle::RunCellDivide(bool updateperiodic){
   }
   TmcStop(Timers,TMC_NlOutCheck);
   BoundChanged=false;
+
+	if(updateperiodic && PeriActive){ // SHABA    Partial slip stuffs
+		delete[] SlipVel; SlipVel=NULL;
+		SlipVel = new tfloat3[Npb];
+		delete[] SlipVelOld; SlipVelOld=NULL;
+		SlipVelOld = new tfloat3[Npb];
+		delete[] MarroneVel; MarroneVel=NULL;
+		MarroneVel = new tfloat3[Npb];
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -498,6 +507,12 @@ void JSphCpuSingle::Interaction_Forces(TpInter tinter){
   const char met[]="Interaction_Forces";
   PreInteraction_Forces(tinter);
   TmcStart(Timers,TMC_CfForces);
+
+	
+		// zeroing the partial slip velocity       SHABA
+		memset(SlipVel,0,sizeof(tfloat3)*Npb);
+		
+	
 
   //-Interaction of Fluid-Fluid/Bound & Bound-Fluid (forces and DEM) / Interaccion Fluid-Fluid/Bound & Bound-Fluid (forces and DEM).
   float viscdt=0;
@@ -839,6 +854,7 @@ void JSphCpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
 		Velrhopc[p].w = RhopZero;
 	}
 	
+
   //-Main Loop / Bucle principal
   //------------------
   bool partoutstop=false;

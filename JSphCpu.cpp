@@ -77,6 +77,10 @@ void JSphCpu::InitVars(){
   NpbPer=NpfPer=0;
   WithFloating=false;
 
+	SlipVel = NULL;   //-Partial Slip    SHABA
+	SlipVelOld = NULL;  //- Old Partial Slip velocity      SHABA
+	MarroneVel = NULL; //- Marrone particle velocity       SHABA
+
   Idpc=NULL; Codec=NULL; Dcellc=NULL; Posc=NULL; Velrhopc=NULL;
   VelrhopM1c=NULL;                //-Verlet
   PosPrec=NULL; VelrhopPrec=NULL; //-Symplectic
@@ -98,6 +102,10 @@ void JSphCpu::InitVars(){
 //==============================================================================
 void JSphCpu::FreeCpuMemoryFixed(){
   MemCpuFixed=0;
+	delete[] SlipVel;   SlipVel=NULL;  // Partial Slip    SHABA
+	delete[] SlipVelOld; SlipVelOld=NULL; // Old Partial Slip SHABA
+	delete[] MarroneVel; MarroneVel=NULL;
+
   delete[] RidpMove;  RidpMove=NULL;
   delete[] FtRidp;    FtRidp=NULL;
   delete[] FtoForces; FtoForces=NULL;
@@ -108,6 +116,10 @@ void JSphCpu::FreeCpuMemoryFixed(){
 //==============================================================================
 void JSphCpu::AllocCpuMemoryFixed(){
   MemCpuFixed=0;
+	SlipVel=new tfloat3[Npb]; MemCpuFixed+=(sizeof(tfloat3)*Npb);    // Partial Slip     SHABA
+	SlipVelOld = new tfloat3[Npb]; MemCpuFixed+=(sizeof(tfloat3)*Npb);   // Old partial slip velocity   SHABA
+	MarroneVel = new tfloat3[Npb]; MemCpuFixed+=(sizeof(tfloat3)*Npb);   // Marrone particle velocity   SHABA
+
   try{
     //-Allocates memory for moving objects.
     if(CaseNmoving){
@@ -409,6 +421,11 @@ void JSphCpu::InitRun(){
   if(UseDEM)DemDtForce=DtIni; //(DEM)
   if(CaseNfloat)InitFloating();
 
+	// hopefully zeroing the marrone and partial slip vectors before the simulation                SHABA
+	memset(SlipVelOld,0,sizeof(tfloat3)*Npb);
+	memset(SlipVel,0,sizeof(tfloat3)*Npb);
+	memset(MarroneVel,0,sizeof(tfloat3)*Npb);
+	
   //-Adjust paramaters to start.
   PartIni=PartBeginFirst;
   TimeStepIni=(!PartIni? 0: PartBeginTimeStep);
@@ -525,6 +542,11 @@ void JSphCpu::PreInteractionVars_Forces(TpInter tinter,unsigned np,unsigned npb)
   for(unsigned p=npb;p<np;p++)Acec[p]=Gravity;                       //Acec[]=Gravity for fluid / para fluid
   if(SpsGradvelc)memset(SpsGradvelc+npb,0,sizeof(tsymatrix3f)*npf);  //SpsGradvelc[]=(0,0,0,0,0,0).
 
+	/*// hopefully saving the old slip velocity and zeroing marrone and slip velocity vectors                    SHABA
+	memcpy(SlipVelOld,SlipVel,sizeof(tfloat3)*Npb);
+	memset(SlipVel,0,sizeof(tfloat3)*Npb);
+	memset(MarroneVel,0,sizeof(tfloat3)*Npb);*/
+	
   //-Apply the extra forces to the correct particle sets.
   if(AccInput)AddAccInput();
 
@@ -753,7 +775,7 @@ void JSphCpu::GetInteractionCells(unsigned rcell
 // calculates the distance between them. The idp of the nearest particle is stored
 // and returned.
 //==============================================================================
-unsigned JSphCpu::FluidHunter(unsigned p1, tdouble3 *pos, unsigned *idp)const
+unsigned JSphCpu::FluidHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const
 {
 	// get the location of the boundary particle
 	tdouble3 boundary=pos[p1];
@@ -786,7 +808,7 @@ unsigned JSphCpu::FluidHunter(unsigned p1, tdouble3 *pos, unsigned *idp)const
 // calculates the distance between them. The idp of the nearest particle is stored
 // and returned.
 //==============================================================================
-unsigned JSphCpu::BoundaryHunter(unsigned Fluid, tdouble3 *pos, unsigned *idp)const
+unsigned JSphCpu::BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsigned *idp)const
 {
 	// get the location of the boundary particle
 	tdouble3 fluid=pos[Fluid];
@@ -858,17 +880,18 @@ void JSphCpu::DistBound(unsigned p1, tdouble3 *pos, unsigned *idp, float &dx, fl
 void JSphCpu::NormalHunter(unsigned p1, tdouble3 *pos, unsigned *idp, float &nx, float &ny, float &nz)const
 {
 	// get the location of the boundary particle
-	tdouble3 bound=pos[p1];
+	tdouble3 bound=pos[p1]; // bound is the position of the boundary particle
 
 	// get idp of the nearest fluid particle
-	unsigned fluid = FluidHunter(p1, pos, idp);
-	unsigned boundary=BoundaryHunter(fluid, pos, idp);
+	unsigned fluid = FluidHunter(p1, pos, idp); // fluid is the nearest fluid particle to bound
+	unsigned boundary=BoundaryHunter(fluid, pos, idp); // boundary is the nearest physical boundary particle to fluid
 	tdouble3 boundary3=pos[boundary];
 
 	double xd=boundary3.x-bound.x;
 	double yd=boundary3.y-bound.y;
 	double zd=boundary3.z-bound.z;
 
+	// these normal point from the boundary particle to the physical boundary into the fluid
 	nx=SignHunter(xd);
 	ny=SignHunter(yd);
 	nz=SignHunter(zd);
@@ -911,6 +934,7 @@ void JSphCpu::MarroneDuplicatePos(unsigned p1,tdouble3 *pos,  unsigned *idp, tdo
   posMar.x+=2*nx*dx;
   posMar.y+=2*ny*dy;
   posMar.z+=2*nz*dz;
+	//cout << p1 <<"\t"<< pos[p1].x <<"\t"<< pos[p1].y <<"\t"<< pos[p1].z << endl <<"p1"<< "\t"<<posMar.x <<"\t"<< posMar.y <<"\t"<< posMar.z << endl << "n" << "\t" << nx << "\t"<< ny << "\t"<< nz << endl;
 }
 
 //==============================================================================              SHABA
@@ -1095,7 +1119,7 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		}
 
 		// adding the body force term to the pressure
-		pmar+= 2*d*RhopZero*(Gravity.x*nx + Gravity.y*ny + Gravity.z*nz); 
+		pmar-= 2*d*RhopZero*(Gravity.x*nx + Gravity.y*ny + Gravity.z*nz); // the normals here need to point out of the fluid, hence the minus sign
 
 		// zero the velocity of the particle on the physical boundary
 		if(d==0){
@@ -1115,6 +1139,218 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 
 }
 
+	//==============================================================================
+//              PARTIAL SLIP BOUNDARY CONDITION CALCULATIONS
+//                              SHABA
+//==============================================================================
+	
+//=================================================================================                     SHABA
+// Function to find the normal componants to a boundary for the placement of Marrone
+// Boundary Particles. The normal found is the normal pointing into the fluid from the 
+// the boundary. Using this normal Marrone probe particles can be placed along this 
+// normal along with the correct distance from the physical boundary.
+//=================================================================================
+void JSphCpu::PSNormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float &nx, float &ny, float &nz)const
+{
+	// get the location of the boundary particle
+	tdouble3 bound=pos[p1];
+	unsigned part1 = Idpc[p1];
+
+	// get idp of the nearest fluid particle
+	unsigned fluid = FluidHunter(p1, pos, idp);
+	unsigned boundary=BoundaryHunter(fluid, pos, idp);
+	tdouble3 boundary3=pos[boundary];
+	tdouble3 fluid3=pos[fluid];
+	unsigned partfluid = Idpc[fluid];
+	unsigned partbound = Idpc[boundary];
+
+	double xd=fluid3.x-boundary3.x;
+	if(sqrt(xd*xd)<Dp/2) xd = 0.0;
+	double yd=fluid3.y-boundary3.y;
+	if(sqrt(yd*yd)<Dp/2) yd = 0.0;
+	double zd=fluid3.z-boundary3.z;
+	if(sqrt(zd*zd)<Dp/2) zd = 0.0;
+
+
+	// using the negative differances to have the normal pointing into the fluid
+	nx=SignHunter(xd);
+	ny=SignHunter(yd);
+	nz=SignHunter(zd);
+
+	float Norm = sqrt(nx*nx + ny*ny + nz*nz);
+	nx = nx/Norm;
+	ny = ny/Norm;
+	nz = nz/Norm;
+}
+
+//===============================================================================                                    SHABA
+// Function to calculate the velocity gradient used in the Partial slip boundary 
+// condition summing over all surrounding fluid and boundary particles
+//===============================================================================
+void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
+	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
+{
+	
+					//		cout << p1 << "\t" <<  pos[p1].x << "\t" <<  pos[p1].y << "\t" <<  pos[p1].z << endl;
+	
+	float ux=0, uy=0, uz=0;
+	float vx=0, vy=0, vz=0;
+	float wx=0, wy=0, wz=0;
+	 //-Obtain limits of interaction / Obtiene limites de interaccion
+  int cxini,cxfin,yini,yfin,zini,zfin;
+  GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
+
+  //-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
+  for(int z=zini;z<zfin;z++){
+    const int zmod=(nc.w)*z+cellinitial; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
+    for(int y=yini;y<yfin;y++){
+      int ymod=zmod+nc.x*y;
+      const unsigned pini=beginendcell[cxini+ymod];
+      const unsigned pfin=beginendcell[cxfin+ymod];
+	
+			for( unsigned p2=pini; p2<pfin;p2++)
+			{
+				const float drx=float(pos[p1].x-pos[p2].x);
+				const float dry=float(pos[p1].y-pos[p2].y);
+				const float drz=float(pos[p1].z-pos[p2].z);
+				const float rr2=drx*drx+dry*dry+drz*drz;
+					if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+						
+							//cout << " First loop" << endl;
+							//cout << p2 << "\t" <<  pos[p2].x << "\t" <<  pos[p2].y << "\t" <<  pos[p2].z << endl;
+						
+					float frx,fry,frz;
+					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
+					float m2=MassFluid;
+					float uij = float(velrhop[p1].x - velrhop[p2].x);
+					float vij = float(velrhop[p1].y - velrhop[p2].y);
+					float wij = float(velrhop[p1].z - velrhop[p2].z);
+
+					ux+=-(m2/velrhop[p2].w)*uij*frx;
+					uy+=-(m2/velrhop[p2].w)*uij*fry;
+					uz+=-(m2/velrhop[p2].w)*uij*frz;
+
+					vx+=-(m2/velrhop[p2].w)*vij*frx;
+					vy+=-(m2/velrhop[p2].w)*vij*fry;
+					vz+=-(m2/velrhop[p2].w)*vij*frz;
+
+					wx+=-(m2/velrhop[p2].w)*wij*frx;
+					wy+=-(m2/velrhop[p2].w)*wij*fry;
+					wz+=-(m2/velrhop[p2].w)*wij*frz;
+
+			
+						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
+					}
+			}
+		}
+	}
+
+	//-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
+	for(int z=zini;z<zfin;z++){
+    const int zmod=(nc.w)*z+0; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
+    for(int y=yini;y<yfin;y++){
+      int ymod=zmod+nc.x*y;
+      const unsigned pini=beginendcell[cxini+ymod];
+      const unsigned pfin=beginendcell[cxfin+ymod];
+	
+			for( unsigned p2=pini; p2<pfin;p2++)
+			{
+				const float drx=float(pos[p1].x-pos[p2].x);
+				const float dry=float(pos[p1].y-pos[p2].y);
+				const float drz=float(pos[p1].z-pos[p2].z);
+				const float rr2=drx*drx+dry*dry+drz*drz;
+					if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+						
+						//	cout << "Second loop" << endl;
+						//	cout << p2 << "\t" <<  pos[p2].x << "\t" <<  pos[p2].y << "\t" <<  pos[p2].z << endl;
+						
+					float frx,fry,frz;
+					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
+					float m2=MassFluid;
+					float uij = float(velrhop[p1].x - velrhop[p2].x);
+					float vij = float(velrhop[p1].y - velrhop[p2].y);
+					float wij = float(velrhop[p1].z - velrhop[p2].z);
+
+					ux+=-(m2/velrhop[p2].w)*uij*frx;
+					uy+=-(m2/velrhop[p2].w)*uij*fry;
+					uz+=-(m2/velrhop[p2].w)*uij*frz;
+
+					vx+=-(m2/velrhop[p2].w)*vij*frx;
+					vy+=-(m2/velrhop[p2].w)*vij*fry;
+					vz+=-(m2/velrhop[p2].w)*vij*frz;
+
+					wx+=-(m2/velrhop[p2].w)*wij*frx;
+					wy+=-(m2/velrhop[p2].w)*wij*fry;
+					wz+=-(m2/velrhop[p2].w)*wij*frz;
+
+			
+						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
+					}
+			}
+		}
+	}
+
+	SlipVelx = ((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
+	SlipVely = ((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
+	SlipVelz = ((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
+
+	//cout << p1 <<"\t"<< pos[p1].x <<"\t"<< pos[p1].y <<"\t"<< pos[p1].z << endl <<"p1"<< "\t"<<SlipVelx <<"\t"<< SlipVely <<"\t"<< SlipVelz << endl;
+}
+
+//================================================================================
+// Function to find the nerest physical boundary particle to an interior 
+// boundary particle
+//================================================================================
+unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const
+{
+	//cout << p1 << "\t" << p1 << "\t" << pos[p1].x << "\t" << pos[p1].y << "\t" << pos[p1].z << "\t" << endl;
+	unsigned Fluid = FluidHunter(p1, pos, idp);
+	//cout << p1 << "\t" << Fluid << "\t" << pos[Fluid].x << "\t" << pos[Fluid].y << "\t" << pos[Fluid].z << "\t" << endl;
+	unsigned Bound = BoundaryHunter(Fluid, pos, idp);
+	//cout << p1 << "\t" << Bound << "\t" << pos[Bound].x << "\t" << pos[Bound].y << "\t" << pos[Bound].z << "\t" << endl;
+	return Bound;
+}
+
+//================================================================================                                    SHABA
+// Function to find the partilces on the physical boundary, find the normals to the boundary 
+// and calculate the partial slip velocity at these boundary particles
+//================================================================================
+void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float b
+	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
+{
+	unsigned Bound = IsBound(p1, pos, idp);
+
+	float nx=0, ny=0, nz=0;
+	//cout << p1 << endl;
+
+	PSNormalHunter(p1, pos, idp, nx, ny, nz);
+	VelocityGradient(Bound, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
+
+	
+	SlipVel[p1].x = b*SlipVelx;
+	SlipVel[p1].y = b*SlipVely;
+	SlipVel[p1].z = b*SlipVelz;
+}
+
+//==============================================================================
+// function to find the non-periodic particle associated to a particle id (idp)
+//==============================================================================
+unsigned JSphCpu::Bouncer(unsigned PartID, const word *code, const unsigned *idp) const
+{
+	unsigned Particle=0;
+	for(unsigned p=0;p<Np;p++)
+	{
+		bool PerryCox=(CODE_GetTypeValue(code[p])==CODE_PERIODIC);
+		if(idp[p]==PartID){
+			if(!PerryCox){
+				Particle = p;
+			}
+		}
+
+	}
+	return(Particle);
+}
+
 //==============================================================================
 /// Realiza interaccion entre particulas. Bound-Fluid/Float
 /// Perform interaction between particles. Bound-Fluid/Float
@@ -1125,6 +1361,46 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   ,tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code, unsigned *idp
   ,float *press,float &viscdt,float *ar)const
 {
+	// Partial Slip Calculations
+									float b=0.01f; // SLIP LENGTH
+									for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
+									{
+											float SlipVelx=0, SlipVely=0, SlipVelz=0;
+											PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
+											//  This loop calculates the partial slip velocities
+		
+									}
+
+									// Marrone Particle calculations  SHABA
+									for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
+									{
+											InteractionForcesMarrone(p1, pos, velrhop, idp, press, code); 
+											// This loop calculates the velocity for the marrone boundary particles and gives the boundary particles this velocity
+		
+										velrhop[p1].x += SlipVel[p1].x;
+										velrhop[p1].y += SlipVel[p1].y;
+										velrhop[p1].z += SlipVel[p1].z;
+										//   This loop adds the partial slip contribution to the boundary particle in the same way as a wall velocity
+									}
+									
+	
+									//periodic particle loop
+									for(unsigned p1=0;p1<Npb;p1++)
+									{
+										bool PerryCox = false;
+										PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
+										if(PerryCox)
+										{
+											unsigned PartID = idp[p1];
+											unsigned p2 = Bouncer(PartID, code, idp);
+											velrhop[p1].x = velrhop[p2].x;
+											velrhop[p1].y = velrhop[p2].y;
+											velrhop[p1].z = velrhop[p2].z;
+											// This loop gives the periodic boundary particle the correct velocity according to the Marrone+PS velocity
+										}
+									}
+	
+
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[MAXTHREADS_OMP*STRIDE_OMP];
   for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
@@ -1133,11 +1409,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   #ifdef _WITHOMP
     #pragma omp parallel for schedule (guided)
   #endif
+
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0;
-
-		// Marrone Particle calculations                       SHABA
-		InteractionForcesMarrone(p1, pos, velrhop, idp, press, code);
 
     //-Load data of particle p1 / Carga datos de particula p1.
     const tfloat3 velp1=TFloat3(velrhop[p1].x,velrhop[p1].y,velrhop[p1].z);
