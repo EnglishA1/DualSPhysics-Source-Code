@@ -467,6 +467,15 @@ void JSphCpuSingle::RunCellDivide(bool updateperiodic){
   }
   TmcStop(Timers,TMC_NlOutCheck);
   BoundChanged=false;
+
+	if(updateperiodic && PeriActive){ // SHABA something to do with partial slip
+		delete[] SlipVel; SlipVel=NULL;
+		SlipVel = new tfloat3[Npb];
+		delete[] AdamiVel; AdamiVel=NULL;
+		AdamiVel = new tfloat4[Npb];
+		delete[] AdamiPress; AdamiPress=NULL;
+		AdamiPress = new float[Npb];
+	}
 }
 
 //------------------------------------------------------------------------------
@@ -498,6 +507,11 @@ void JSphCpuSingle::Interaction_Forces(TpInter tinter){
   const char met[]="Interaction_Forces";
   PreInteraction_Forces(tinter);
   TmcStart(Timers,TMC_CfForces);
+
+	// zeroing the partial slip velocity before the calculation
+	memset(SlipVel,0,sizeof(tfloat3)*Npb);
+	memset(AdamiVel,0,sizeof(tfloat4)*Npb);
+	memset(AdamiPress,0,sizeof(float)*Npb);
 
   //-Interaction of Fluid-Fluid/Bound & Bound-Fluid (forces and DEM) / Interaccion Fluid-Fluid/Bound & Bound-Fluid (forces and DEM).
   float viscdt=0;

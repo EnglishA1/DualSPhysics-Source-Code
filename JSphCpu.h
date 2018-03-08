@@ -164,9 +164,25 @@ protected:
   inline float GetKernelCubicTensil(float rr2,float rhopp1,float pressp1,float rhopp2,float pressp2)const;
 
 	// New Adami calculation                      SHABA
+	tfloat4 *AdamiVel;
+	float *AdamiPress;
 	void AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, float *press, float &Adamix, float &Adamiy, float &Adamiz, float &AdamiPress, float &AdamiRhop)const;
 	unsigned Bouncer(unsigned PartID, const word *code, const unsigned *idp) const;
 	inline float GetKernelWab(float rr2,float drx,float dry,float drz)const;     
+
+	// PARTIAL SLIP FUNCTIONS        SHABA
+	//===============================================================================================
+	tfloat3 *SlipVel; // Slip Velocity       SHABA
+	unsigned FluidHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
+	unsigned BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsigned *idp)const;
+	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float &nx, float &ny, float &nz)const;
+	float SignHunter(double number)const;
+	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
+		,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const;
+	unsigned IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
+	void PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float b
+		,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const;
+	//================================================================================================
 
 
   inline void GetInteractionCells(unsigned rcell
