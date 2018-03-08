@@ -2394,7 +2394,7 @@ template<bool shift> void JSphCpu::ComputeSymplecticCorrT(double dt){
   for(int p=0;p<npb;p++){
     const double epsilon_rdot=(-double(Arc[p])/double(Velrhopc[p].w))*dt;
     const float rhopnew=float(double(VelrhopPrec[p].w) * (2.-epsilon_rdot)/(2.+epsilon_rdot));
-    Velrhopc[p]=TFloat4(0,0,0,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorbed by boundary ones / Evita q las boundary absorvan a las fluidas.
+    Velrhopc[p]=TFloat4(VelrhopPrec[p].x,VelrhopPrec[p].y,VelrhopPrec[p].z,(rhopnew<RhopZero? RhopZero: rhopnew));//-Avoid fluid particles being absorbed by boundary ones / Evita q las boundary absorvan a las fluidas.
   }
 
   //-Calculate fluid values / Calcula datos de fluido.
