@@ -1115,60 +1115,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 	,float *press
   ,float &viscdt,float *ar)const            // ^  changed to float for the global velocity     SHABA
 {
-	
-  //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
-  float viscth[MAXTHREADS_OMP*STRIDE_OMP];
-  for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
-  //-Inicia ejecucion con OpenMP.
-  const int pfin=int(pinit+n);
-  #ifdef _WITHOMP
-    #pragma omp parallel for schedule (guided)
-  #endif
-
-	//======================================================================================================= SHABA
-	// non periodic particle loop
-  for(int p1=int(pinit);p1<pfin;p1++){
-							float visc=0,arp1=0;
-		
-							bool PerryCox = false;
-							PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
-							if(!PerryCox){
-							// defining the Adami parameters and doing the calculation if p2 is a boundary particle
-							float Adamix=0, Adamiy=0, Adamiz=0, Adamipress=0, AdamiRhop=0;
-							AdamiCalc(p1,pos,velrhop,press,Adamix,Adamiy,Adamiz,Adamipress,AdamiRhop);	
-							AdamiVel[p1].x = Adamix;
-							AdamiVel[p1].y = Adamiy;
-							AdamiVel[p1].z = Adamiz;
-							AdamiVel[p1].w = AdamiRhop;
-							AdamiPress[p1] = Adamipress;
-
-							velrhop[p1].x = AdamiVel[p1].x;
-							velrhop[p1].y = AdamiVel[p1].y;
-							velrhop[p1].z = AdamiVel[p1].z;
-							velrhop[p1].w = AdamiVel[p1].w;
-							press[p1] = AdamiPress[p1];
-							}
-	}
-	
-	//periodic particle loop
-	for(int p1=int(pinit);p1<pfin;p1++){
-
-							bool PerryCox = false;
-							PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
-							if(PerryCox){
-							unsigned PartID = idp[p1];
-							unsigned p2 = Bouncer(PartID, code, idp);
-							AdamiVel[p1].w = AdamiVel[p2].w;
-							AdamiPress[p1] = AdamiPress[p2];
-
-							velrhop[p1].x = AdamiVel[p1].x;
-							velrhop[p1].y = AdamiVel[p1].y;
-							velrhop[p1].z = AdamiVel[p1].z;
-							velrhop[p1].w = AdamiVel[p1].w;
-							press[p1] = AdamiPress[p1];		
-							}
-	}
-
+	//============================================================================================SHABA
 	// Partial Slip Calculations
 	float b=0.01f; // SLIP LENGTH
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
@@ -1201,6 +1148,54 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 		}
 	}
 	//===================================================================================================================
+	
+  //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
+  float viscth[MAXTHREADS_OMP*STRIDE_OMP];
+  for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
+  //-Inicia ejecucion con OpenMP.
+  const int pfin=int(pinit+n);
+  #ifdef _WITHOMP
+    #pragma omp parallel for schedule (guided)
+  #endif
+
+	//======================================================================================================= SHABA
+	// non periodic particle loop
+  for(int p1=int(pinit);p1<pfin;p1++){
+							float visc=0,arp1=0;
+		
+							bool PerryCox = false;
+							PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
+							if(!PerryCox){
+							// defining the Adami parameters and doing the calculation if p2 is a boundary particle
+							float Adamix=0, Adamiy=0, Adamiz=0, Adamipress=0, AdamiRhop=0;
+							AdamiCalc(p1,pos,velrhop,press,Adamix,Adamiy,Adamiz,Adamipress,AdamiRhop);	
+							AdamiVel[p1].x = Adamix;
+							AdamiVel[p1].y = Adamiy;
+							AdamiVel[p1].z = Adamiz;
+							AdamiVel[p1].w = AdamiRhop;
+							AdamiPress[p1] = Adamipress;
+
+							velrhop[p1].w = AdamiVel[p1].w;
+							press[p1] = AdamiPress[p1];
+							}
+	}
+	
+	//periodic particle loop
+	for(int p1=int(pinit);p1<pfin;p1++){
+
+							bool PerryCox = false;
+							PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
+							if(PerryCox){
+							unsigned PartID = idp[p1];
+							unsigned p2 = Bouncer(PartID, code, idp);
+							AdamiVel[p1].w = AdamiVel[p2].w;
+							AdamiPress[p1] = AdamiPress[p2];
+
+							velrhop[p1].w = AdamiVel[p1].w;
+							press[p1] = AdamiPress[p1];		
+							}
+	}
+ //================================================================================================
 
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
   for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
