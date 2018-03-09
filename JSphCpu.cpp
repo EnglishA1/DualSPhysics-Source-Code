@@ -974,7 +974,7 @@ float JSphCpu::MLSDet3(float a11, float a12, float a13, float a14, float a22, fl
 
 	float det1=0, det2=0, det3=0, det4=0;
 
-	det1 = a11*(a22*a44 - a23*a23);
+	det1 = a11*(a22*a44 - a24*a24);
 	det2 = a12*(a24*a14 - a12*a44);
 	det3 = a14*(a12*a24 - a22*a14);
 
