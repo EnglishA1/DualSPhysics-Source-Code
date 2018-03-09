@@ -1115,40 +1115,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 	,float *press
   ,float &viscdt,float *ar)const            // ^  changed to float for the global velocity     SHABA
 {
-	//============================================================================================SHABA
-	// Partial Slip Calculations
-	float b=0.01f; // SLIP LENGTH
-	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
-	{
-			float SlipVelx=0, SlipVely=0, SlipVelz=0;
-			PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
-		
-	}
-
-	for (unsigned p1=0;p1<Npb;p1++) // assigning particles partial slip velocities
-	{
-		
-		velrhop[p1].x = SlipVel[p1].x;
-		velrhop[p1].y = SlipVel[p1].y;
-		velrhop[p1].z = SlipVel[p1].z;
-	}
-	
-	//periodic particle loop
-	for(unsigned p1=0;p1<Npb;p1++)
-	{
-		bool PerryCox = false;
-		PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
-		if(PerryCox)
-		{
-			unsigned PartID = idp[p1];
-			unsigned p2 = Bouncer(PartID, code, idp);
-			velrhop[p1].x = velrhop[p2].x;
-			velrhop[p1].y = velrhop[p2].y;
-			velrhop[p1].z = velrhop[p2].z;
-		}
-	}
-	//===================================================================================================================
-	
+	/*
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[MAXTHREADS_OMP*STRIDE_OMP];
   for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
@@ -1156,12 +1123,36 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   const int pfin=int(pinit+n);
   #ifdef _WITHOMP
     #pragma omp parallel for schedule (guided)
-  #endif
+  #endif*/
 
-	//======================================================================================================= SHABA
-	// non periodic particle loop
+	//============================================================================================SHABA
+	// Partial Slip Calculations
+	float b=0.01f; // SLIP LENGTH
+	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity and Adami Velocity
+	{
+			float SlipVelx=0, SlipVely=0, SlipVelz=0;
+			PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
+		
+			bool PerryCox = false;
+							PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
+							if(!PerryCox){
+							// defining the Adami parameters and doing the calculation if p2 is a boundary particle
+							float Adamix=0, Adamiy=0, Adamiz=0, Adamipress=0, AdamiRhop=0;
+							AdamiCalc(p1,pos,velrhop,press,Adamix,Adamiy,Adamiz,Adamipress,AdamiRhop);	
+							AdamiVel[p1].x = Adamix;
+							AdamiVel[p1].y = Adamiy;
+							AdamiVel[p1].z = Adamiz;
+							AdamiVel[p1].w = AdamiRhop;
+							AdamiPress[p1] = Adamipress;
+
+							velrhop[p1].w = AdamiVel[p1].w;
+							press[p1] = AdamiPress[p1];
+							}
+	}
+
+	/*// Adami Calculation
   for(int p1=int(pinit);p1<pfin;p1++){
-							float visc=0,arp1=0;
+							//float visc=0,arp1=0;
 		
 							bool PerryCox = false;
 							PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
@@ -1178,10 +1169,18 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 							velrhop[p1].w = AdamiVel[p1].w;
 							press[p1] = AdamiPress[p1];
 							}
+	}*/
+
+	for (unsigned p1=0;p1<Npb;p1++) // assigning particles velocities according to Adami and partial slip
+	{
+		
+		velrhop[p1].x = AdamiVel[p1].x + 2*SlipVel[p1].x;
+		velrhop[p1].y = AdamiVel[p1].y + 2*SlipVel[p1].y;
+		velrhop[p1].z = AdamiVel[p1].z + 2*SlipVel[p1].z;
 	}
-	
+
 	//periodic particle loop
-	for(int p1=int(pinit);p1<pfin;p1++){
+	for(unsigned p1=0;p1<Npb;p1++){
 
 							bool PerryCox = false;
 							PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
@@ -1191,6 +1190,10 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 							AdamiVel[p1].w = AdamiVel[p2].w;
 							AdamiPress[p1] = AdamiPress[p2];
 
+							velrhop[p1].x = velrhop[p2].x;
+							velrhop[p1].y = velrhop[p2].y;
+							velrhop[p1].z = velrhop[p2].z;
+
 							velrhop[p1].w = AdamiVel[p1].w;
 							press[p1] = AdamiPress[p1];		
 							}
@@ -1198,7 +1201,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
  //================================================================================================
 
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
-  for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
+ // for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
 }
 
 //==============================================================================
@@ -1296,6 +1299,15 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 						//========================================================================================== SHABA
 						// Reorder the calculation for Adami particles
             //-Density derivative
+
+						// if p2 is a boundary particle, remove the Adami properties for the density calculation
+						//position 1
+						if(p2<Npb){
+							velp2.x = SlipVel[p2].x;
+							velp2.y = SlipVel[p2].y;
+							velp2.z = SlipVel[p2].z;
+
+						}
             float dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
             if(compute)arp1+=massp2*(dvx*frx+dvy*fry+dvz*frz);
 
@@ -1309,18 +1321,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
               deltap1=(boundp2? FLT_MAX: deltap1+delta);
             }
 
-						// if p2 is a boundary particle, it it given the Adami properties
-						//position 1
-						if(p2<Npb){
-							velp2.x = AdamiVel[p2].x + SlipVel[p2].x;
-							velp2.y = AdamiVel[p2].y + SlipVel[p2].y;
-							velp2.z = AdamiVel[p2].z + SlipVel[p2].z;
-
-							//pressp2 = AdamiPress;
-							//rhopp2 = AdamiRhop;
-
-							dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
-						}
+						velp2 = TFloat3(velrhop[p2].x,velrhop[p2].y,velrhop[p2].z);
+						dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
 
 						//moved from before the density derivative
 						//===== Acceleration ===== 
