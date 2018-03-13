@@ -1377,7 +1377,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 											InteractionForcesMarrone(p1, pos, velrhop, idp, press, code); 
 											// This loop calculates the velocity for the marrone boundary particles and gives the boundary particles this velocity
 		
-										velrhop[p1].x += SlipVel[p1].x;
+										velrhop[p1].x += 2*SlipVel[p1].x;
 										//velrhop[p1].y += SlipVel[p1].y;
 										//velrhop[p1].z += SlipVel[p1].z;
 										//   This loop adds the partial slip contribution to the boundary particle in the same way as a wall velocity
