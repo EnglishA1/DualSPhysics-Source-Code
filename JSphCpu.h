@@ -175,6 +175,7 @@ protected:
 	tfloat3 *SlipVel; // Slip Velocity       SHABA
 	unsigned FluidHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	unsigned BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsigned *idp)const;
+	unsigned MidPointHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float &nx, float &ny, float &nz)const;
 	float SignHunter(double number)const;
 	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
