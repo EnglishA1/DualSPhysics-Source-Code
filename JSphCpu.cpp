@@ -967,17 +967,58 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 	SlipVelz = ((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
 }
 
-//================================================================================
+/*//================================================================================
 // Function to find the nerest physical boundary particle to an interior 
 // boundary particle
 //================================================================================
-unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const
+unsigned JSphCpu::IsBoundGeneral(unsigned p1, const tdouble3 *pos, const unsigned *idp)const
 {
 	//cout << p1 << "\t" << p1 << "\t" << pos[p1].x << "\t" << pos[p1].y << "\t" << pos[p1].z << "\t" << endl;
 	unsigned Fluid = FluidHunter(p1, pos, idp);
 	//cout << p1 << "\t" << Fluid << "\t" << pos[Fluid].x << "\t" << pos[Fluid].y << "\t" << pos[Fluid].z << "\t" << endl;
 	unsigned Bound = BoundaryHunter(Fluid, pos, idp);
 	//cout << p1 << "\t" << Bound << "\t" << pos[Bound].x << "\t" << pos[Bound].y << "\t" << pos[Bound].z << "\t" << endl;
+	return Bound;
+}*/
+
+//================================================================================
+//
+//================================================================================
+unsigned JSphCpu::MidPointHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const
+{
+	tdouble3 boundary=pos[p1];
+
+	unsigned MidPoint = 0;
+	double distance = 10;
+
+	for(unsigned p2=0;p2<Npb;p2++)
+	{
+		if(pos[p2].z == boundary.z)
+		{
+			double dx = 0.15-pos[p2].x;
+			double radius = sqrt(dx*dx);
+			if(radius <=distance)
+			{
+				distance = radius;
+				MidPoint = p2;
+			}
+		}
+	}
+	return MidPoint;
+}
+
+//================================================================================
+// Function to find the boundary particle on the boundary surface in the middle of  
+// the boundary where the partial slip calculation will be done   #NotHappyAboutIt
+//================================================================================
+unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const
+{
+	unsigned MidPoint = MidPointHunter(p1,pos,idp); // finds the midpoint of a row of particles
+
+	unsigned Fluid = FluidHunter(MidPoint, pos, idp); // finds the nearest fluid particle to midpoint
+	
+	unsigned Bound = BoundaryHunter(Fluid, pos, idp); // find the nearest boundary particle to fluid
+	
 	return Bound;
 }
 

@@ -174,6 +174,7 @@ protected:
 	unsigned FluidHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	unsigned BoundaryHunter(unsigned Fluid, const tdouble3 *pos, const unsigned *idp)const;
 	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float &nx, float &ny, float &nz)const;
+	unsigned MidPointHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	float SignHunter(double number)const;
 	void VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
 		,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const;
