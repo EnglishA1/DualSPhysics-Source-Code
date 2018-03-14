@@ -647,6 +647,7 @@ double JSphCpuSingle::ComputeStep_Sym(){
   PosInteraction_Forces();                //-Free memory used for interaction / Libera memoria de interaccion
 
   DtPre=min(ddt_p,ddt_c);                 //-Calcula el dt para el siguiente ComputeStep
+	
   return(dt);
 }
 
@@ -866,6 +867,7 @@ void JSphCpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
     if(PartDtMin>stepdt)PartDtMin=stepdt; if(PartDtMax<stepdt)PartDtMax=stepdt;
     if(CaseNmoving)RunMotion(stepdt);
     RunCellDivide(true);
+		
     TimeStep+=stepdt;
     partoutstop=(Np<NpMinimum || !Np);
     if(TimeStep>=TimePartNext || partoutstop){
@@ -873,6 +875,7 @@ void JSphCpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
         Log->Print("\n**** Particles OUT limit reached...\n");
         TimeMax=TimeStep;
       }
+			
       SaveData();
       Part++;
       PartNstep=Nstep;

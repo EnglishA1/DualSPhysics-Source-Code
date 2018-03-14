@@ -1197,9 +1197,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 	for (unsigned p1=0;p1<Npb;p1++) // assigning particles velocities according to Adami and partial slip
 	{
 		
-		velrhop[p1].x = AdamiVel[p1].x + 2*SlipVel[p1].x;
-		velrhop[p1].y = AdamiVel[p1].y + 2*SlipVel[p1].y;
-		velrhop[p1].z = AdamiVel[p1].z + 2*SlipVel[p1].z;
+		velrhop[p1].x = AdamiVel[p1].x + 0.04f;//2*SlipVel[p1].x;
+		velrhop[p1].y = AdamiVel[p1].y;//+ 2*SlipVel[p1].y;
+		velrhop[p1].z = AdamiVel[p1].z;//+ 2*SlipVel[p1].z;
 	}
 
 	//periodic particle loop
@@ -2241,6 +2241,7 @@ double JSphCpu::DtVariable(bool final){
   if(DtFixed)dt=DtFixed->GetDt(float(TimeStep),float(dt));
   if(dt<double(DtMin)){ dt=double(DtMin); DtModif++; }
   if(SaveDt && final)SaveDt->AddValues(TimeStep,dt,dt1*CFLnumber,dt2*CFLnumber,AceMax,ViscDtMax,VelMax);
+	cout << AceMax << "\t" << dt1 << "\t" << Gravity.x << "\t" << Gravity.y << "\t" <<Gravity.z<<  endl;
   return(dt);
 }
 
