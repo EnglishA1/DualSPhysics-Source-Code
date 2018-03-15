@@ -999,17 +999,17 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 					float vij = float(velrhop[p1].y - velrhop[p2].y);
 					float wij = float(velrhop[p1].z - velrhop[p2].z);
 
-					ux+=-(m2/velrhop[p2].w)*uij*frx;
-					uy+=-(m2/velrhop[p2].w)*uij*fry;
+					//ux+=-(m2/velrhop[p2].w)*uij*frx;
+					//uy+=-(m2/velrhop[p2].w)*uij*fry;
 					uz+=-(m2/velrhop[p2].w)*uij*frz;
 
-					vx+=-(m2/velrhop[p2].w)*vij*frx;
-					vy+=-(m2/velrhop[p2].w)*vij*fry;
-					vz+=-(m2/velrhop[p2].w)*vij*frz;
+					//vx+=-(m2/velrhop[p2].w)*vij*frx;
+					//vy+=-(m2/velrhop[p2].w)*vij*fry;
+					//vz+=-(m2/velrhop[p2].w)*vij*frz;
 
-					wx+=-(m2/velrhop[p2].w)*wij*frx;
-					wy+=-(m2/velrhop[p2].w)*wij*fry;
-					wz+=-(m2/velrhop[p2].w)*wij*frz;
+					//wx+=-(m2/velrhop[p2].w)*wij*frx;
+					//wy+=-(m2/velrhop[p2].w)*wij*fry;
+					//wz+=-(m2/velrhop[p2].w)*wij*frz;
 
 			
 						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
@@ -1044,17 +1044,17 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 					float vij = float(velrhop[p1].y - velrhop[p2].y);
 					float wij = float(velrhop[p1].z - velrhop[p2].z);
 
-					ux+=-(m2/velrhop[p2].w)*uij*frx;
-					uy+=-(m2/velrhop[p2].w)*uij*fry;
+					//ux+=-(m2/velrhop[p2].w)*uij*frx;
+					//uy+=-(m2/velrhop[p2].w)*uij*fry;
 					uz+=-(m2/velrhop[p2].w)*uij*frz;
 
-					vx+=-(m2/velrhop[p2].w)*vij*frx;
-					vy+=-(m2/velrhop[p2].w)*vij*fry;
-					vz+=-(m2/velrhop[p2].w)*vij*frz;
+					//vx+=-(m2/velrhop[p2].w)*vij*frx;
+					//vy+=-(m2/velrhop[p2].w)*vij*fry;
+					//vz+=-(m2/velrhop[p2].w)*vij*frz;
 
-					wx+=-(m2/velrhop[p2].w)*wij*frx;
-					wy+=-(m2/velrhop[p2].w)*wij*fry;
-					wz+=-(m2/velrhop[p2].w)*wij*frz;
+					//wx+=-(m2/velrhop[p2].w)*wij*frx;
+					//wy+=-(m2/velrhop[p2].w)*wij*fry;
+					//wz+=-(m2/velrhop[p2].w)*wij*frz;
 
 			
 						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
