@@ -1232,7 +1232,7 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 
 					//vx+=-(m2/velrhop[p2].w)*vij*frx;
 					//vy+=-(m2/velrhop[p2].w)*vij*fry;
-				  //vz+=-(m2/velrhop[p2].w)*vij*frz;
+				 // vz+=-(m2/velrhop[p2].w)*vij*frz;
 
 					//wx+=-(m2/velrhop[p2].w)*wij*frx;
 					//wy+=-(m2/velrhop[p2].w)*wij*fry;
@@ -1359,7 +1359,7 @@ unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)
 void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float b
 	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
 {
-	unsigned Bound = IsBound(p1, pos, idp);
+	unsigned Bound = IsBoundGeneral(p1, pos, idp);
 
 	float nx=0, ny=0, nz=0;
 	//cout << p1 << endl;
@@ -1417,20 +1417,12 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 									{
 											InteractionForcesMarrone(p1, pos, velrhop, idp, press, code); 
 											// This loop calculates the velocity for the marrone boundary particles and gives the boundary particles this velocity
-
-											if(p1==IsBoundGeneral(p1,pos,idp))
-											{
+											
 													velrhop[p1].x += SlipVel[p1].x;
 													//velrhop[p1].y += SlipVel[p1].y;
 													//velrhop[p1].z += SlipVel[p1].z;
-											}
-											else
-											{
-													velrhop[p1].x += 2*SlipVel[p1].x;
-													//velrhop[p1].y += SlipVel[p1].y;
-													//velrhop[p1].z += SlipVel[p1].z;
 													//   This loop adds the partial slip contribution to the boundary particle in the same way as a wall velocity
-											}
+											
 									}
 									
 	
@@ -2494,11 +2486,11 @@ template<bool shift> void JSphCpu::ComputeSymplecticCorrT(double dt){
 //==============================================================================
 double JSphCpu::DtVariable(bool final){
   //-dt1 depends on force per unit mass.
-  const double dt1=(AceMax? (sqrt(double(H)/AceMax)): DBL_MAX); 
+  const double dt1=10;//(AceMax? (sqrt(double(H)/AceMax)): DBL_MAX); 
   //-dt2 combines the Courant and the viscous time-step controls.
-  const double dt2=double(H)/(max(Cs0,VelMax*10.)+double(H)*ViscDtMax);
+  const double dt2=double(H)/(15/*(max(Cs0,VelMax*10.)/*+double(H)*ViscDtMax*/);
   //-dt new value of time step.
-  double dt=double(CFLnumber)*min(dt1,dt2);
+  double dt=double(CFLnumber)*min(dt2,dt2);
   if(DtFixed)dt=DtFixed->GetDt(float(TimeStep),float(dt));
   if(dt<double(DtMin)){ dt=double(DtMin); DtModif++; }
   if(SaveDt && final)SaveDt->AddValues(TimeStep,dt,dt1*CFLnumber,dt2*CFLnumber,AceMax,ViscDtMax,VelMax);
