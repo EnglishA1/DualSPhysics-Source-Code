@@ -1955,9 +1955,9 @@ double JSphCpu::DtVariable(bool final){
   //-dt1 depends on force per unit mass.
   const double dt1=(AceMax? (sqrt(double(H)/AceMax)): DBL_MAX); 
   //-dt2 combines the Courant and the viscous time-step controls.
-  const double dt2=double(H)/(max(Cs0,VelMax*10.)+double(H)*ViscDtMax);
+  const double dt2=double(H)/15;/*(max(Cs0,VelMax*10.)+double(H)*ViscDtMax);*/
   //-dt new value of time step.
-  double dt=double(CFLnumber)*min(dt1,dt2); // #SHABA changed the dt1 to dt2
+  double dt=double(CFLnumber)*min(dt2,dt2); // #SHABA changed the dt1 to dt2
   if(DtFixed)dt=DtFixed->GetDt(float(TimeStep),float(dt));
   if(dt<double(DtMin)){ dt=double(DtMin); DtModif++; }
   if(SaveDt && final)SaveDt->AddValues(TimeStep,dt,dt1*CFLnumber,dt2*CFLnumber,AceMax,ViscDtMax,VelMax);
