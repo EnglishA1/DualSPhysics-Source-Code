@@ -1359,7 +1359,7 @@ unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)
 void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float b
 	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
 {
-	unsigned Bound = IsBoundGeneral(p1, pos, idp);
+	unsigned Bound = IsBound(p1, pos, idp);
 
 	float nx=0, ny=0, nz=0;
 	//cout << p1 << endl;
@@ -1518,6 +1518,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   }
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
   for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
+	
 }
 
 //==============================================================================
@@ -2215,7 +2216,7 @@ void JSphCpu::UpdatePos(tdouble3 rpos,double movx,double movy,double movz
   //-Check validity of displacement / Comprueba validez del desplazamiento.
   bool outmove=(fabs(float(movx))>MovLimit || fabs(float(movy))>MovLimit || fabs(float(movz))>MovLimit);
   //-Aplica desplazamiento.
-  rpos.x+=movx; rpos.y+=movy; rpos.z+=movz;
+  //rpos.x+=movx; rpos.y+=movy; rpos.z+=movz; // removed for fixed particles 
   //-Check limits of real domain / Comprueba limites del dominio reales.
   double dx=rpos.x-MapRealPosMin.x;
   double dy=rpos.y-MapRealPosMin.y;
@@ -2240,7 +2241,7 @@ void JSphCpu::UpdatePos(tdouble3 rpos,double movx,double movy,double movz
     bool outy=!yperi && (dy<0 || dy>=MapRealSize.y);
     bool outz=!zperi && (dz<0 || dz>=MapRealSize.z);
     out=(outx||outy||outz);
-    rpos=TDouble3(dx,dy,dz)+MapRealPosMin;
+    //rpos=TDouble3(dx,dy,dz)+MapRealPosMin;  // removed for fixed particles hopefully
   }
   //-Keep currnt position / Guarda posicion actualizada.
   pos[p]=rpos;
@@ -2395,7 +2396,7 @@ template<bool shift> void JSphCpu::ComputeSymplecticPreT(double dt){
         dz+=double(ShiftPosc[p].z);
       }
       bool outrhop=(rhopnew<RhopOutMin||rhopnew>RhopOutMax);
-      UpdatePos(PosPrec[p],dx,dy,dz,outrhop,p,Posc,Dcellc,Codec);
+      UpdatePos(PosPrec[p],dx,dy,dz,outrhop,p,Posc,Dcellc,Codec);      // commented out for fixed particles
       //-Update velocity & density / Actualiza velocidad y densidad.
       Velrhopc[p].x=float(double(VelrhopPrec[p].x)+double(Acec[p].x)* dt05);
       Velrhopc[p].y=float(double(VelrhopPrec[p].y)+double(Acec[p].y)* dt05);
@@ -2464,7 +2465,7 @@ template<bool shift> void JSphCpu::ComputeSymplecticCorrT(double dt){
         dz+=double(ShiftPosc[p].z);
       }
       bool outrhop=(rhopnew<RhopOutMin||rhopnew>RhopOutMax);
-      UpdatePos(PosPrec[p],dx,dy,dz,outrhop,p,Posc,Dcellc,Codec);
+      UpdatePos(PosPrec[p],dx,dy,dz,outrhop,p,Posc,Dcellc,Codec);  // commented out to have fixed particles
     }
     else{//-Floating Particles / Particulas: Floating
       Velrhopc[p]=VelrhopPrec[p];
@@ -2486,11 +2487,11 @@ template<bool shift> void JSphCpu::ComputeSymplecticCorrT(double dt){
 //==============================================================================
 double JSphCpu::DtVariable(bool final){
   //-dt1 depends on force per unit mass.
-  const double dt1=10;//(AceMax? (sqrt(double(H)/AceMax)): DBL_MAX); 
+  const double dt1=(AceMax? (sqrt(double(H)/AceMax)): DBL_MAX); 
   //-dt2 combines the Courant and the viscous time-step controls.
-  const double dt2=double(H)/(15/*(max(Cs0,VelMax*10.)/*+double(H)*ViscDtMax*/);
+  const double dt2=double(H)/(max(Cs0,VelMax*10.)+double(H)*ViscDtMax);
   //-dt new value of time step.
-  double dt=double(CFLnumber)*min(dt2,dt2);
+  double dt=double(CFLnumber)*min(dt1,dt2);
   if(DtFixed)dt=DtFixed->GetDt(float(TimeStep),float(dt));
   if(dt<double(DtMin)){ dt=double(DtMin); DtModif++; }
   if(SaveDt && final)SaveDt->AddValues(TimeStep,dt,dt1*CFLnumber,dt2*CFLnumber,AceMax,ViscDtMax,VelMax);
