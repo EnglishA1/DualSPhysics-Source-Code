@@ -762,7 +762,7 @@ float JSphCpu::GetKernelWab(float rr2,float drx,float dry,float drz)const{
 // Function to calculate the velocities, pressure and density of a boundary particle
 // using the Adami boundary method. This will be slow and could very probably be sped up
 //==============================================================================
-void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, float *press, float &Adamix, float &Adamiy, float &Adamiz, float &Adamipress, float &AdamiRhop)const
+void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, float *press, float &Adamix, float &Adamiy, float &Adamiz, float &Adamipress, float &AdamiRhop, const unsigned *idp)const
 {
 
 	tdouble3 PosBound = pos[p2];
@@ -799,6 +799,16 @@ void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, floa
 	AdamiRhop = RhopZero*(pow(bracket,1/Gamma));
 
 	if(kernel ==0)  // Ensuring theat there are no infinite velocities, densities or pressures
+	{
+		Adamix = 0;
+		Adamiy = 0;
+		Adamiz = 0;
+		AdamiRhop = RhopZero;
+		Adamipress=CteB*(pow(AdamiRhop/RhopZero,Gamma)-1.0f);  
+	}
+
+	unsigned bound = IsBoundGeneral(p2,pos,idp);
+	if(p2==bound)
 	{
 		Adamix = 0;
 		Adamiy = 0;
@@ -1068,7 +1078,7 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 	SlipVelz = ((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
 }
 
-/*//================================================================================
+//================================================================================
 // Function to find the nerest physical boundary particle to an interior 
 // boundary particle
 //================================================================================
@@ -1080,7 +1090,7 @@ unsigned JSphCpu::IsBoundGeneral(unsigned p1, const tdouble3 *pos, const unsigne
 	unsigned Bound = BoundaryHunter(Fluid, pos, idp);
 	//cout << p1 << "\t" << Bound << "\t" << pos[Bound].x << "\t" << pos[Bound].y << "\t" << pos[Bound].z << "\t" << endl;
 	return Bound;
-}*/
+}
 
 //================================================================================
 //
@@ -1169,7 +1179,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 
 	//============================================================================================SHABA
 	// Partial Slip Calculations
-	float b=0.01f; // SLIP LENGTH
+	float b=0.00f; // SLIP LENGTH
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity and Adami Velocity
 	{
 			float SlipVelx=0, SlipVely=0, SlipVelz=0;
@@ -1180,7 +1190,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 							if(!PerryCox){
 							// defining the Adami parameters and doing the calculation if p2 is a boundary particle
 							float Adamix=0, Adamiy=0, Adamiz=0, Adamipress=0, AdamiRhop=0;
-							AdamiCalc(p1,pos,velrhop,press,Adamix,Adamiy,Adamiz,Adamipress,AdamiRhop);	
+							AdamiCalc(p1,pos,velrhop,press,Adamix,Adamiy,Adamiz,Adamipress,AdamiRhop,idp);	
 							AdamiVel[p1].x = Adamix;
 							AdamiVel[p1].y = Adamiy;
 							AdamiVel[p1].z = Adamiz;
