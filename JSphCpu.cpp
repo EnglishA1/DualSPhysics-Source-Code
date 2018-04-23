@@ -746,7 +746,7 @@ void JSphCpu::GetInteractionCells(unsigned rcell
 /// Kernel summation for the Wendland kernal to be used in Shepard filtering
 /// or Adami boundaries. Returns the summation element fac                      
 //==============================================================================
-float JSphCpu::GetKernelWab(float rr2,float drx,float dry,float drz)const{
+float JSphCpu::GetKernelWab(float drx,float dry,float drz)const{
   const float rr=drx*drx+dry*dry+drz*drz;
 	const float rad=sqrt(rr);
   const float qq=rad/H;
@@ -776,16 +776,16 @@ void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, floa
           const float drz=float(PosBound.z-pos[p1].z);
           const float rr2=drx*drx+dry*dry+drz*drz;
           if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
-						kernel += GetKernelWab(rr2, drx, dry, drz);
+						kernel += GetKernelWab(drx, dry, drz);
 
-						Adamix += velrhop[p1].x*GetKernelWab(rr2, drx, dry, drz);
-						Adamiy += velrhop[p1].y*GetKernelWab(rr2, drx, dry, drz);
-						Adamiz += velrhop[p1].z*GetKernelWab(rr2, drx, dry, drz);
+						Adamix += velrhop[p1].x*GetKernelWab(drx, dry, drz);
+						Adamiy += velrhop[p1].y*GetKernelWab(drx, dry, drz);
+						Adamiz += velrhop[p1].z*GetKernelWab(drx, dry, drz);
 
-						Adamipress += press[p1]*GetKernelWab(rr2, drx, dry, drz);
-						presx += velrhop[p1].w*drx*GetKernelWab(rr2, drx, dry, drz);
-						presy += velrhop[p1].w*dry*GetKernelWab(rr2, drx, dry, drz);
-						presz += velrhop[p1].w*drz*GetKernelWab(rr2, drx, dry, drz);
+						Adamipress += press[p1]*GetKernelWab(drx, dry, drz);
+						presx += velrhop[p1].w*drx*GetKernelWab(drx, dry, drz);
+						presy += velrhop[p1].w*dry*GetKernelWab(drx, dry, drz);
+						presz += velrhop[p1].w*drz*GetKernelWab(drx, dry, drz);
 
 					}
 	}
@@ -970,7 +970,7 @@ float JSphCpu::SignHunter(double number)const
 // Function to calculate the velocity gradient used in the Partial slip boundary 
 // condition summing over all surrounding fluid and boundary particles
 //===============================================================================
-void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
+void JSphCpu::VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
 	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
 {
 	
@@ -980,7 +980,7 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 	float vx=0, vy=0, vz=0;
 	float wx=0, wy=0, wz=0;
 	 //-Obtain limits of interaction / Obtiene limites de interaccion
-  int cxini,cxfin,yini,yfin,zini,zfin;
+ /* int cxini,cxfin,yini,yfin,zini,zfin;
   GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
 
   //-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
@@ -1071,7 +1071,43 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 					}
 			}
 		}
-	}
+	}*/
+
+	for( unsigned p2=0; p2<Np;p2++)
+			{
+				const float drx=float(PSProbe.x-pos[p2].x);
+				const float dry=float(PSProbe.y-pos[p2].y);
+				const float drz=float(PSProbe.z-pos[p2].z);
+				const float rr2=drx*drx+dry*dry+drz*drz;
+					if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+						
+							//cout << " First loop" << endl;
+							//cout << p2 << "\t" <<  pos[p2].x << "\t" <<  pos[p2].y << "\t" <<  pos[p2].z << endl;
+						
+					float frx,fry,frz;
+					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
+					float m2=MassFluid;
+					
+					float uij = float(PSProbeVel.x - velrhop[p2].x);
+					float vij = float(PSProbeVel.y - velrhop[p2].y);
+					float wij = float(PSProbeVel.z - velrhop[p2].z);
+
+					//ux+=-(m2/velrhop[p2].w)*uij*frx;
+					//uy+=-(m2/velrhop[p2].w)*uij*fry;
+					uz+=-(m2/velrhop[p2].w)*uij*frz;
+
+					//vx+=-(m2/velrhop[p2].w)*vij*frx;
+					//vy+=-(m2/velrhop[p2].w)*vij*fry;
+				  //vz+=-(m2/velrhop[p2].w)*vij*frz;
+
+					//wx+=-(m2/velrhop[p2].w)*wij*frx;
+					//wy+=-(m2/velrhop[p2].w)*wij*fry;
+					//wz+=-(m2/velrhop[p2].w)*wij*frz;
+
+			
+						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
+					}
+			}
 	
 	SlipVelx = ((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
 	SlipVely = ((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
@@ -1134,6 +1170,33 @@ unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)
 }
 
 
+//================================================================================
+// Function to find the velocity at the imaginary boundary line to be used in 
+// the partial slip calulation
+//================================================================================
+void JSphCpu::BoundaryVel(tdouble3 PSProbe, tfloat3 &PSProbeVel, const tdouble3 *pos, const tfloat4 *velrhop)const
+{
+
+	for( unsigned p2=0; p2<Np;p2++)
+	{
+		const float drx = float(PSProbe.x - pos[p2].x);
+		const float dry = float(PSProbe.y - pos[p2].y);
+		const float drz = float(PSProbe.z - pos[p2].z);
+		const float rr2 = drx*drx + dry*dry + drz*drz;
+
+		if(rr2<=Fourh2 && rr2>=ALMOSTZERO)
+		{
+			float massp2 = MassFluid;
+
+			PSProbeVel.x += (massp2/velrhop[p2].w)*velrhop[p2].x*GetKernelWab(drx,dry,drz);
+			PSProbeVel.y += (massp2/velrhop[p2].w)*velrhop[p2].y*GetKernelWab(drx,dry,drz);
+			PSProbeVel.z += (massp2/velrhop[p2].w)*velrhop[p2].z*GetKernelWab(drx,dry,drz);
+
+		}
+
+	}
+}
+
 //================================================================================                                    SHABA
 // Function to find the partilces on the physical boundary, find the normals to the boundary 
 // and calculate the partial slip velocity at these boundary particles
@@ -1147,7 +1210,17 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 	//cout << p1 << endl;
 
 	NormalHunter(p1, pos, idp, nx, ny, nz);
-	VelocityGradient(Bound, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
+
+	tdouble3 PSProbe = pos[Bound];
+	PSProbe.x += nx*Dp/2;
+	PSProbe.y += ny*Dp/2;
+	PSProbe.z += nz*Dp/2;
+
+	tfloat3 PSProbeVel;
+	BoundaryVel(PSProbe, PSProbeVel, pos, velrhop);
+
+
+	VelocityGradient(PSProbe, PSProbeVel, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
 	// bound is the particle around which the particle slip calculation is done
 	
 	SlipVel[p1].x = b*SlipVelx;
@@ -1179,11 +1252,11 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 
 	//============================================================================================SHABA
 	// Partial Slip Calculations
-	float b=0.00f; // SLIP LENGTH
+	float b=0.0f; // SLIP LENGTH
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity and Adami Velocity
 	{
-			//float SlipVelx=0, SlipVely=0, SlipVelz=0;
-			//PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
+			float SlipVelx=0, SlipVely=0, SlipVelz=0;
+			PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
 		
 			bool PerryCox = false;
 							PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
@@ -1207,7 +1280,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 	for (unsigned p1=0;p1<Npb;p1++) // assigning particles velocities according to Adami and partial slip
 	{
 		
-		velrhop[p1].x = AdamiVel[p1].x;// + 2*SlipVel[p1].x;
+		velrhop[p1].x = AdamiVel[p1].x + 2*SlipVel[p1].x;
 		velrhop[p1].y = AdamiVel[p1].y;//+ 2*SlipVel[p1].y;
 		velrhop[p1].z = AdamiVel[p1].z;//+ 2*SlipVel[p1].z;
 	}
@@ -1336,9 +1409,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 						// if p2 is a boundary particle, remove the Adami properties for the density calculation
 						//position 1
 						if(p2<Npb){
-							velp2.x = 0.0;//SlipVel[p2].x;
-							velp2.y = 0.0;//SlipVel[p2].y;
-							velp2.z = 0.0;//SlipVel[p2].z;
+							velp2.x = SlipVel[p2].x;
+							velp2.y = SlipVel[p2].y;
+							velp2.z = SlipVel[p2].z;
 
 						}
             float dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
