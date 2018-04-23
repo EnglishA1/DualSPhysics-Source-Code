@@ -810,6 +810,69 @@ void JSphCpuSingle::RunFloating(double dt,bool predictor){
   }
 }
 
+//==============================================================================                        SHABA
+// Function to find the sign of a number. If the number is positive the function 
+// returns 1, if it is negative the function returns -1. If the number is zero the 
+// function returns 1.
+//==============================================================================
+float JSphCpuSingle::SignHunter(double number)const
+{
+	float norm=0;
+	float zero=0;
+	if(number>zero){
+		norm=1;}
+	if(number<zero){
+		norm=-1;}
+	
+	return norm;
+}
+
+
+//==============================================================================
+// Function to set the density of all particles to 1000, set the mass of physical
+// boundary paricles to zero and move the boundary particles behind the physical
+// boundary dp/2 closer to the fluid for use by the Marrone boundary particle
+// method
+//==============================================================================                 SHABA
+void JSphCpuSingle::Alterations(){
+
+	// Setting all the particle densities to the reference density for the flow                     SHABA
+	for( unsigned p=0;p<Np;p++){
+		Velrhopc[p].w = RhopZero;
+	}
+
+	// Giving the fluid particles analytical velocity
+	/*for (unsigned p=Npb;p<Np;p++) 
+	{
+		Velrhopc[p].x = 4.0*(0.5*0.5 + 2.0*0.01*0.5 - Posc[p].z*Posc[p].z);
+		Velrhopc[p].y=0.0;
+		Velrhopc[p].z=0.0;
+	}*/
+
+	// moving boundary particles dp/2 away from the fluid
+	for (unsigned p=0;p<Npb;p++)
+	{
+		double z = SignHunter(Posc[p].z);
+		
+		Posc[p].z += z*Dp/2;
+	}
+
+	// moving the all fluid particles up by dp/2 and the fluid particle outside of the channel into the channel
+	for(unsigned p=Npb;p<Np;p++)
+	{
+		Posc[p].z += Dp/2;
+
+		if(Posc[p].z<=-0.6)
+		{
+			Posc[p].z = -0.5+Dp/2;
+		}
+
+	}
+
+
+
+}
+
 //==============================================================================
 /// Inicia proceso de simulacion.
 /// Initial processing of simulation.
@@ -841,10 +904,8 @@ void JSphCpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
   TmcResetValues(Timers);
   TmcStop(Timers,TMC_Init);
   PartNstep=-1; Part++;
-	for(unsigned p=0;p<Np;p++) // SHABA setting all particle density to 1000 rather than still water density, for some reason everything blows up
- 	{
-			Velrhopc[p].w=RhopZero;
-	}
+	// moving the particles slighty and changing the density to 1000
+	Alterations();
 
   //-Main Loop / Bucle principal
   //------------------

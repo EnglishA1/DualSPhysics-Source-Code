@@ -75,6 +75,10 @@ protected:
   void SaveData();
   void FinishRun(bool stop);
 
+	// new functions to move the particles
+	float SignHunter(double number)const;
+	void Alterations();
+
 public:
   JSphCpuSingle();
   ~JSphCpuSingle();
