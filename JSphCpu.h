@@ -178,7 +178,7 @@ protected:
 	unsigned MidPointHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float &nx, float &ny, float &nz)const;
 	float SignHunter(double number)const;
-	void VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
+	void VelocityGradient(unsigned p1, tdouble3 PSProbe, tfloat3 PSProbeVel, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
 		,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const;
 	unsigned IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	unsigned IsBoundGeneral(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
