@@ -75,6 +75,10 @@ protected:
   void SaveData();
   void FinishRun(bool stop);
 
+	// New function SHABA
+	float SignHunter(double number)const;
+	void Alterations();
+
 public:
   JSphCpuSingle();
   ~JSphCpuSingle();

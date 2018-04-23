@@ -1182,8 +1182,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 	float b=0.00f; // SLIP LENGTH
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity and Adami Velocity
 	{
-			float SlipVelx=0, SlipVely=0, SlipVelz=0;
-			PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
+			//float SlipVelx=0, SlipVely=0, SlipVelz=0;
+			//PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
 		
 			bool PerryCox = false;
 							PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
@@ -1207,7 +1207,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 	for (unsigned p1=0;p1<Npb;p1++) // assigning particles velocities according to Adami and partial slip
 	{
 		
-		velrhop[p1].x = AdamiVel[p1].x + 2*SlipVel[p1].x;
+		velrhop[p1].x = AdamiVel[p1].x;// + 2*SlipVel[p1].x;
 		velrhop[p1].y = AdamiVel[p1].y;//+ 2*SlipVel[p1].y;
 		velrhop[p1].z = AdamiVel[p1].z;//+ 2*SlipVel[p1].z;
 	}
@@ -1336,9 +1336,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 						// if p2 is a boundary particle, remove the Adami properties for the density calculation
 						//position 1
 						if(p2<Npb){
-							velp2.x = SlipVel[p2].x;
-							velp2.y = SlipVel[p2].y;
-							velp2.z = SlipVel[p2].z;
+							velp2.x = 0.0;//SlipVel[p2].x;
+							velp2.y = 0.0;//SlipVel[p2].y;
+							velp2.z = 0.0;//SlipVel[p2].z;
 
 						}
             float dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
