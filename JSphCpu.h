@@ -160,13 +160,15 @@ protected:
   void PosInteraction_Forces();
 
   inline void GetKernel(float rr2,float drx,float dry,float drz,float &frx,float &fry,float &frz)const;
-	inline float GetKernelWab(float rr2)const;
+	
   inline void GetKernelCubic(float rr2,float drx,float dry,float drz,float &frx,float &fry,float &frz)const;
   inline float GetKernelCubicTensil(float rr2,float rhopp1,float pressp1,float rhopp2,float pressp2)const;
 
   inline void GetInteractionCells(unsigned rcell
     ,int hdiv,const tint4 &nc,const tint3 &cellzero
     ,int &cxini,int &cxfin,int &yini,int &yfin,int &zini,int &zfin)const;
+
+	float GetKernelWab(float drx,float dry,float drz)const;
 
 	// PARTIAL SLIP FUNCTIONS        SHABA
 	//===============================================================================================
@@ -176,7 +178,7 @@ protected:
 	void NormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp, float &nx, float &ny, float &nz)const;
 	unsigned MidPointHunter(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	float SignHunter(double number)const;
-	void VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
+	void VelocityGradient(unsigned p1, tdouble3 PSProbe, tfloat3 PSProbeVel, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
 		,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const;
 	unsigned IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)const;
 	void PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, float &SlipVelz, const tdouble3 *pos, tfloat4 *velrhop, const unsigned *idp, float b

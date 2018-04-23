@@ -728,6 +728,22 @@ void JSphCpu::GetInteractionCells(unsigned rcell
   zfin=cz+min(nc.z-cz-1,hdiv)+1;
 }
 
+//==============================================================================                                       SHABA
+/// Kernel summation for the Wendland kernal to be used in Shepard filtering
+/// or Adami boundaries. Returns the summation element fac                      
+//==============================================================================
+float JSphCpu::GetKernelWab(float drx,float dry,float drz)const{
+  const float rr=drx*drx+dry*dry+drz*drz;
+	const float rad=sqrt(rr);
+  const float qq=rad/H;
+  //-Wendland kernel
+  const float wqq1=1.f-0.5f*qq;
+	const float wqq2=2.f*qq+1.f;
+  const float fac=Awen*wqq1*wqq1*wqq1*wqq1*wqq2;
+ 
+	return(fac);
+}
+
 //==============================================================================
 //              PARTIAL SLIP BOUNDARY CONDITION CALCULATIONS
 //                              SHABA
@@ -859,7 +875,7 @@ float JSphCpu::SignHunter(double number)const
 // Function to calculate the velocity gradient used in the Partial slip boundary 
 // condition summing over all surrounding fluid and boundary particles
 //===============================================================================
-void JSphCpu::VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
+void JSphCpu::VelocityGradient(unsigned p1, tdouble3 PSProbe, tfloat3 PSProbeVel, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
 	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
 {
 	
@@ -868,7 +884,7 @@ void JSphCpu::VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdoub
 	float ux=0, uy=0, uz=0;
 	float vx=0, vy=0, vz=0;
 	float wx=0, wy=0, wz=0;
-	/* //-Obtain limits of interaction / Obtiene limites de interaccion
+	 //-Obtain limits of interaction / Obtiene limites de interaccion
   int cxini,cxfin,yini,yfin,zini,zfin;
   GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
 
@@ -882,9 +898,9 @@ void JSphCpu::VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdoub
 	
 			for( unsigned p2=pini; p2<pfin;p2++)
 			{
-				const float drx=float(pos[p1].x-pos[p2].x);
-				const float dry=float(pos[p1].y-pos[p2].y);
-				const float drz=float(pos[p1].z-pos[p2].z);
+				const float drx=float(PSProbe.x-pos[p2].x);
+				const float dry=float(PSProbe.y-pos[p2].y);
+				const float drz=float(PSProbe.z-pos[p2].z);
 				const float rr2=drx*drx+dry*dry+drz*drz;
 					if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
 						
@@ -894,9 +910,9 @@ void JSphCpu::VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdoub
 					float frx,fry,frz;
 					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
 					float m2=MassFluid;
-					float uij = float(velrhop[p1].x - velrhop[p2].x);
-					float vij = float(velrhop[p1].y - velrhop[p2].y);
-					float wij = float(velrhop[p1].z - velrhop[p2].z);
+					float uij = float(PSProbeVel.x - velrhop[p2].x);
+					float vij = float(PSProbeVel.y - velrhop[p2].y);
+					float wij = float(PSProbeVel.z - velrhop[p2].z);
 
 					//ux+=-(m2/velrhop[p2].w)*uij*frx;
 					//uy+=-(m2/velrhop[p2].w)*uij*fry;
@@ -927,9 +943,9 @@ void JSphCpu::VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdoub
 	
 			for( unsigned p2=pini; p2<pfin;p2++)
 			{
-				const float drx=float(pos[p1].x-pos[p2].x);
-				const float dry=float(pos[p1].y-pos[p2].y);
-				const float drz=float(pos[p1].z-pos[p2].z);
+				const float drx=float(PSProbe.x-pos[p2].x);
+				const float dry=float(PSProbe.y-pos[p2].y);
+				const float drz=float(PSProbe.z-pos[p2].z);
 				const float rr2=drx*drx+dry*dry+drz*drz;
 					if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
 						
@@ -939,9 +955,9 @@ void JSphCpu::VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdoub
 					float frx,fry,frz;
 					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
 					float m2=MassFluid;
-					float uij = float(velrhop[p1].x - velrhop[p2].x);
-					float vij = float(velrhop[p1].y - velrhop[p2].y);
-					float wij = float(velrhop[p1].z - velrhop[p2].z);
+					float uij = float(PSProbeVel.x - velrhop[p2].x);
+					float vij = float(PSProbeVel.y - velrhop[p2].y);
+					float wij = float(PSProbeVel.z - velrhop[p2].z);
 
 					//ux+=-(m2/velrhop[p2].w)*uij*frx;
 					//uy+=-(m2/velrhop[p2].w)*uij*fry;
@@ -960,9 +976,9 @@ void JSphCpu::VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdoub
 					}
 			}
 		}
-	}*/
+	}
 
-	for( unsigned p2=0; p2<Np;p2++)
+	/*for( unsigned p2=0; p2<Np;p2++)
 			{
 				const float drx=float(PSProbe.x-pos[p2].x);
 				const float dry=float(PSProbe.y-pos[p2].y);
@@ -996,7 +1012,7 @@ void JSphCpu::VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdoub
 			
 						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
 					}
-			}
+			}*/
 	
 	SlipVelx = ((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
 	SlipVely = ((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
@@ -1107,7 +1123,7 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 	tfloat3 PSProbeVel;
 	BoundaryVel(PSProbe, PSProbeVel, pos, velrhop);
 
-	VelocityGradient(PSProbe, PSProbeVel , pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
+	VelocityGradient(Bound, PSProbe, PSProbeVel , pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
 
 	
 	SlipVel[p1].x = b*SlipVelx;
@@ -1145,7 +1161,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   ,float &viscdt,float *ar)const
 {
 	// Partial Slip Calculations       SHABA
-	/*float b=0.01f; // SLIP LENGTH
+	float b=0.01f; // SLIP LENGTH
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
 	{
 			float SlipVelx=0, SlipVely=0, SlipVelz=0;
@@ -1174,7 +1190,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 			velrhop[p1].y = velrhop[p2].y;
 			velrhop[p1].z = velrhop[p2].z;
 		}
-	}*/
+	}
 
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[MAXTHREADS_OMP*STRIDE_OMP];
