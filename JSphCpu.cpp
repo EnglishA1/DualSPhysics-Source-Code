@@ -861,13 +861,15 @@ void JSphCpu::DistBound(unsigned p1, tdouble3 *pos, unsigned *idp, float &dx, fl
 	dy=sqrt(ydist*ydist);
 	dz=sqrt(zdist*zdist);
 
-	if(dx-Dp2<0) xflag=true;
+	dx+=Dp2; dy+=Dp2; dz+=Dp2; // moving the position of the bondary dp/2 closer to the fluid
+
+/*	if(dx-Dp2<0) xflag=true;
 	if(dy-Dp2<0) yflag=true;
 	if(dz-Dp2<0) zflag=true;
 
 	if(xflag) dx=0;
 	if(yflag) dy=0;
-	if(zflag) dz=0;
+	if(zflag) dz=0;*/
 
 }
 
@@ -894,7 +896,7 @@ void JSphCpu::NormalHunter(unsigned p1, tdouble3 *pos, unsigned *idp, float &nx,
 	// these normal point from the boundary particle to the physical boundary into the fluid
 	nx=SignHunter(xd);
 	ny=SignHunter(yd);
-	nz=SignHunter(zd);
+	nz=SignHunter(zd - SignHunter(bound.z));
 }
 
 //==============================================================================                        SHABA
@@ -929,11 +931,13 @@ void JSphCpu::MarroneDuplicatePos(unsigned p1,tdouble3 *pos,  unsigned *idp, tdo
   //-Find displacement and direction
 	float dx, dy, dz, nx, ny, nz;
 	DistBound(p1, pos, idp, dx, dy, dz);
+	//cout << dx << "\t" << dy << "\t" << dz << endl;
 	NormalHunter(p1, pos, idp, nx, ny, nz);
 	//-Apply displacement / Aplica desplazamiento.
   posMar.x+=2*nx*dx;
   posMar.y+=2*ny*dy;
   posMar.z+=2*nz*dz;
+	//cout << Dp << endl;
 	//cout << p1 <<"\t"<< pos[p1].x <<"\t"<< pos[p1].y <<"\t"<< pos[p1].z << endl <<"p1"<< "\t"<<posMar.x <<"\t"<< posMar.y <<"\t"<< posMar.z << endl << "n" << "\t" << nx << "\t"<< ny << "\t"<< nz << endl;
 }
 
@@ -1058,7 +1062,7 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		float dx=posMar.x-posp1.x;
 		float dy=posMar.y-posp1.y;
 		float dz=posMar.z-posp1.z;
-	//	cout << posp1.x << "\t" << posp1.y << "\t" << posp1.z << endl;
+		//cout << posp1.x << "\t" << posp1.y << "\t" << posp1.z << endl;
 		//cout << posMar.x << "\t" << posMar.y << "\t" << posMar.z << endl;
 
 
@@ -1119,15 +1123,15 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		}
 
 		// adding the body force term to the pressure
-		pmar-= 2*d*RhopZero*(Gravity.x*nx + Gravity.y*ny + Gravity.z*nz); // the normals here need to point out of the fluid, hence the minus sign
+		pmar-= 2*d*RhopZero*(Gravity.x*nx + Gravity.y*ny + Gravity.z*nz); // the normals here need to point out of the fluid hence the minus sign
 
 		// zero the velocity of the particle on the physical boundary
-		if(d==0){
+		/*if(d==0){
 			umar=0;
 			vmar=0;
 			wmar=0;
 			pmar=0;
-		}
+		}*/
 
 		// giving the velocities to the boundary particles
 		velrhop[p1].x=-umar;
@@ -1136,6 +1140,8 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		// giving the pressure to the boundary particles
 		press[p1]=pmar;
 		velrhop[p1].w = pow((press[p1]/CteB)+1,1/Gamma)*RhopZero;
+		//press[p1]=0.0; // fixed pressure =0
+	  //velrhop[p1].w = RhopZero; // fixed density = 1000
 
 }
 
@@ -1187,8 +1193,8 @@ void JSphCpu::PSNormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *i
 // Function to calculate the velocity gradient used in the Partial slip boundary 
 // condition summing over all surrounding fluid and boundary particles
 //===============================================================================
-void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
-	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
+void JSphCpu::VelocityGradient(tdouble3 PSProbe, tfloat3 PSProbeVel, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
+	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell, const unsigned *idp)const
 {
 	
 					//		cout << p1 << "\t" <<  pos[p1].x << "\t" <<  pos[p1].y << "\t" <<  pos[p1].z << endl;
@@ -1197,7 +1203,7 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 	float vx=0, vy=0, vz=0;
 	float wx=0, wy=0, wz=0;
 	 //-Obtain limits of interaction / Obtiene limites de interaccion
-  int cxini,cxfin,yini,yfin,zini,zfin;
+ /* int cxini,cxfin,yini,yfin,zini,zfin;
   GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
 
   //-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
@@ -1222,21 +1228,22 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 					float frx,fry,frz;
 					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
 					float m2=MassFluid;
+					
 					float uij = float(velrhop[p1].x - velrhop[p2].x);
 					float vij = float(velrhop[p1].y - velrhop[p2].y);
 					float wij = float(velrhop[p1].z - velrhop[p2].z);
 
-					//ux+=-(m2/velrhop[p2].w)*uij*frx;
-					//uy+=-(m2/velrhop[p2].w)*uij*fry;
+					ux+=-(m2/velrhop[p2].w)*uij*frx;
+					uy+=-(m2/velrhop[p2].w)*uij*fry;
 					uz+=-(m2/velrhop[p2].w)*uij*frz;
 
-					//vx+=-(m2/velrhop[p2].w)*vij*frx;
-					//vy+=-(m2/velrhop[p2].w)*vij*fry;
-				 // vz+=-(m2/velrhop[p2].w)*vij*frz;
+					vx+=-(m2/velrhop[p2].w)*vij*frx;
+					vy+=-(m2/velrhop[p2].w)*vij*fry;
+				  vz+=-(m2/velrhop[p2].w)*vij*frz;
 
-					//wx+=-(m2/velrhop[p2].w)*wij*frx;
-					//wy+=-(m2/velrhop[p2].w)*wij*fry;
-					//wz+=-(m2/velrhop[p2].w)*wij*frz;
+					wx+=-(m2/velrhop[p2].w)*wij*frx;
+					wy+=-(m2/velrhop[p2].w)*wij*fry;
+					wz+=-(m2/velrhop[p2].w)*wij*frz;
 
 			
 						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
@@ -1267,9 +1274,48 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 					float frx,fry,frz;
 					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
 					float m2=MassFluid;
+					
 					float uij = float(velrhop[p1].x - velrhop[p2].x);
 					float vij = float(velrhop[p1].y - velrhop[p2].y);
 					float wij = float(velrhop[p1].z - velrhop[p2].z);
+
+					ux+=-(m2/velrhop[p2].w)*uij*frx;
+					uy+=-(m2/velrhop[p2].w)*uij*fry;
+					uz+=-(m2/velrhop[p2].w)*uij*frz;
+
+					vx+=-(m2/velrhop[p2].w)*vij*frx;
+					vy+=-(m2/velrhop[p2].w)*vij*fry;
+					vz+=-(m2/velrhop[p2].w)*vij*frz;
+
+					wx+=-(m2/velrhop[p2].w)*wij*frx;
+					wy+=-(m2/velrhop[p2].w)*wij*fry;
+					wz+=-(m2/velrhop[p2].w)*wij*frz;
+
+			
+						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
+					}
+			}
+		}
+	}*/
+
+	for( unsigned p2=0; p2<Np;p2++)
+			{
+				const float drx=float(PSProbe.x-pos[p2].x);
+				const float dry=float(PSProbe.y-pos[p2].y);
+				const float drz=float(PSProbe.z-pos[p2].z);
+				const float rr2=drx*drx+dry*dry+drz*drz;
+					if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+						
+							//cout << " First loop" << endl;
+							//cout << p2 << "\t" <<  pos[p2].x << "\t" <<  pos[p2].y << "\t" <<  pos[p2].z << endl;
+						
+					float frx,fry,frz;
+					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
+					float m2=MassFluid;
+					
+					float uij = float(PSProbeVel.x - velrhop[p2].x);
+					float vij = float(PSProbeVel.y - velrhop[p2].y);
+					float wij = float(PSProbeVel.z - velrhop[p2].z);
 
 					//ux+=-(m2/velrhop[p2].w)*uij*frx;
 					//uy+=-(m2/velrhop[p2].w)*uij*fry;
@@ -1277,7 +1323,7 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 
 					//vx+=-(m2/velrhop[p2].w)*vij*frx;
 					//vy+=-(m2/velrhop[p2].w)*vij*fry;
-					//vz+=-(m2/velrhop[p2].w)*vij*frz;
+				  //vz+=-(m2/velrhop[p2].w)*vij*frz;
 
 					//wx+=-(m2/velrhop[p2].w)*wij*frx;
 					//wy+=-(m2/velrhop[p2].w)*wij*fry;
@@ -1287,8 +1333,6 @@ void JSphCpu::VelocityGradient(unsigned p1, const tdouble3 *pos, tfloat4 *velrho
 						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
 					}
 			}
-		}
-	}
 
 	SlipVelx = ((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
 	SlipVely = ((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
@@ -1352,6 +1396,33 @@ unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)
 	return Bound;
 }
 
+//================================================================================
+// Function to find the velocity at the imaginary boundary line to be used in 
+// the partial slip calulation
+//================================================================================
+void JSphCpu::BoundaryVel(tdouble3 PSProbe, tfloat3 &PSProbeVel, const tdouble3 *pos, const tfloat4 *velrhop)const
+{
+
+	for( unsigned p2=0; p2<Np;p2++)
+	{
+		const float drx = float(PSProbe.x - pos[p2].x);
+		const float dry = float(PSProbe.y - pos[p2].y);
+		const float drz = float(PSProbe.z - pos[p2].z);
+		const float rr2 = drx*drx + dry*dry + drz*drz;
+
+		if(rr2<=Fourh2 && rr2>=ALMOSTZERO)
+		{
+			float massp2 = MassFluid;
+
+			PSProbeVel.x += (massp2/velrhop[p2].w)*velrhop[p2].x*GetKernelWab(drx,dry,drz);
+			PSProbeVel.y += (massp2/velrhop[p2].w)*velrhop[p2].y*GetKernelWab(drx,dry,drz);
+			PSProbeVel.z += (massp2/velrhop[p2].w)*velrhop[p2].z*GetKernelWab(drx,dry,drz);
+
+		}
+
+	}
+}
+
 //================================================================================                                    SHABA
 // Function to find the partilces on the physical boundary, find the normals to the boundary 
 // and calculate the partial slip velocity at these boundary particles
@@ -1365,7 +1436,17 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 	//cout << p1 << endl;
 
 	PSNormalHunter(p1, pos, idp, nx, ny, nz);
-	VelocityGradient(Bound, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
+
+	tdouble3 PSProbe = pos[Bound];
+	PSProbe.x += nx*Dp/2;
+	PSProbe.y += ny*Dp/2;
+	PSProbe.z += nz*Dp/2;
+
+	tfloat3 PSProbeVel;
+	BoundaryVel(PSProbe, PSProbeVel, pos, velrhop);
+
+
+	VelocityGradient(PSProbe, PSProbeVel, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell,idp);
 
 	
 	SlipVel[p1].x = b*SlipVelx;
@@ -1402,6 +1483,13 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   ,tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code, unsigned *idp
   ,float *press,float &viscdt,float *ar)const
 {
+	//-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
+  //float viscth[MAXTHREADS_OMP*STRIDE_OMP];
+  //for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
+	/*#ifdef _WITHOMP
+    #pragma omp parallel for schedule (guided)
+  #endif*/
+
 	// Partial Slip Calculations
 									float b=0.01f; // SLIP LENGTH
 									for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
@@ -1418,9 +1506,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 											InteractionForcesMarrone(p1, pos, velrhop, idp, press, code); 
 											// This loop calculates the velocity for the marrone boundary particles and gives the boundary particles this velocity
 											
-													velrhop[p1].x += SlipVel[p1].x;
+													velrhop[p1].x += 2*SlipVel[p1].x;
 													//velrhop[p1].y += SlipVel[p1].y;
-													//velrhop[p1].z += SlipVel[p1].z;
+												//	velrhop[p1].z += SlipVel[p1].z;
 													//   This loop adds the partial slip contribution to the boundary particle in the same way as a wall velocity
 											
 									}
@@ -1442,15 +1530,13 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 										}
 									}
 	
-
+/*
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
   float viscth[MAXTHREADS_OMP*STRIDE_OMP];
   for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
   //-Inicia ejecucion con OpenMP.
   const int pfin=int(pinit+n);
-  #ifdef _WITHOMP
-    #pragma omp parallel for schedule (guided)
-  #endif
+ 
 
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0;
@@ -1518,7 +1604,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   }
   //-Keep max value in viscdt / Guarda en viscdt el valor maximo.
   for(int th=0;th<OmpThreads;th++)if(viscdt<viscth[th*STRIDE_OMP])viscdt=viscth[th*STRIDE_OMP];
-	
+	*/
 }
 
 //==============================================================================
@@ -1529,8 +1615,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   (unsigned n,unsigned pinit,tint4 nc,int hdiv,unsigned cellinitial,float visco
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
   ,const tsymatrix3f* tau,tsymatrix3f* gradvel
-  ,const tdouble3 *pos,const tfloat3 *pspos,const tfloat4 *velrhop,const word *code,const unsigned *idp
-  ,const float *press 
+  ,const tdouble3 *pos,const tfloat3 *pspos, tfloat4 *velrhop,const word *code,const unsigned *idp
+  , float *press 
   ,float &viscdt,float *ar,tfloat3 *ace,float *delta
   ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const
 {
@@ -1543,6 +1629,12 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   #ifdef _WITHOMP
     #pragma omp parallel for schedule (guided)
   #endif
+
+	// fixed density and pressure
+	/*for(int p1=int(pinit);p1<pfin;p1++){ 
+		press[p1]=0.0;
+		velrhop[p1].w = RhopZero; 
+	}*/
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0,deltap1=0;
     tfloat3 acep1=TFloat3(0);
@@ -1592,9 +1684,15 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
             float frx,fry,frz;
             if(tker==KERNEL_Wendland)GetKernel(rr2,drx,dry,drz,frx,fry,frz);
             else if(tker==KERNEL_Cubic)GetKernelCubic(rr2,drx,dry,drz,frx,fry,frz);
+						tfloat3 velp2=TFloat3(velrhop[p2].x,velrhop[p2].y,velrhop[p2].z);
 
             //===== Get mass of particle p2  /  Obtiene masa de particula p2 ===== 
             float massp2=(boundp2? MassBound: MassFluid); //-Contiene masa de particula segun sea bound o fluid.
+
+						//setting the mass of physical boundary particles to zero  SHABA
+						/*if(IsBoundGeneral(p2,pos,idp)==p2)
+						{massp2=0.0;}*/
+
             bool ftp2=false;    //-Indicate if it is floating / Indica si es floating.
             bool compute=true;  //-Deactivate when using DEM and if it is of type float-float or float-bound /  Se desactiva cuando se usa DEM y es float-float o float-bound.
             if(USE_FLOATING){
@@ -1609,15 +1707,25 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
               compute=!(USE_DEM && ftp1 && (boundp2 || ftp2)); //-Deactivate when using DEM and if it is of type float-float or float-bound / Se desactiva cuando se usa DEM y es float-float o float-bound.
             }
 
-            //===== Acceleration ===== 
-            if(compute){
-              const float prs=(pressp1+press[p2])/(rhopp1*velrhop[p2].w) + (tker==KERNEL_Cubic? GetKernelCubicTensil(rr2,rhopp1,pressp1,velrhop[p2].w,press[p2]): 0);
-              const float p_vpm=-prs*massp2*ftmassp1;
-              acep1.x+=p_vpm*frx; acep1.y+=p_vpm*fry; acep1.z+=p_vpm*frz;
-            }
+						/*if(p2<Npb){
+							// zero velocity
+							velp2.x = 0.0;
+							velp2.y = 0.0;
+							velp2.x = 0.0;
 
+							// Marrone velocity
+							velp2.x -= SlipVel[p2].x;
+							velp2.y -= 0.0;
+							velp2.x -= 0.0;
+
+							// Slip Velocity
+							velp2.x = SlipVel[p2].x;
+							velp2.y = 0.0;
+							velp2.x = 0.0;
+						}*/
+            
             //-Density derivative
-            const float dvx=velp1.x-velrhop[p2].x, dvy=velp1.y-velrhop[p2].y, dvz=velp1.z-velrhop[p2].z;
+            float dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
             if(compute)arp1+=massp2*(dvx*frx+dvy*fry+dvz*frz);
 
             const float cbar=(float)Cs0;
@@ -1628,6 +1736,16 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
               const float dot3=(drx*frx+dry*fry+drz*frz);
               const float delta=visc_densi*dot3*massp2;
               deltap1=(boundp2? FLT_MAX: deltap1+delta);
+            }
+
+						velp2=TFloat3(velrhop[p2].x,velrhop[p2].y,velrhop[p2].z);
+            dvx=velp1.x-velp2.x, dvy=velp1.y-velp2.y, dvz=velp1.z-velp2.z;
+
+						//===== Acceleration ===== 
+            if(compute){
+              const float prs=(pressp1+press[p2])/(rhopp1*velrhop[p2].w) + (tker==KERNEL_Cubic? GetKernelCubicTensil(rr2,rhopp1,pressp1,velrhop[p2].w,press[p2]): 0);
+              const float p_vpm=-prs*massp2*ftmassp1;
+              acep1.x+=p_vpm*frx; acep1.y+=p_vpm*fry; acep1.z+=p_vpm*frz;
             }
 
             //-Shifting correction
@@ -2216,7 +2334,7 @@ void JSphCpu::UpdatePos(tdouble3 rpos,double movx,double movy,double movz
   //-Check validity of displacement / Comprueba validez del desplazamiento.
   bool outmove=(fabs(float(movx))>MovLimit || fabs(float(movy))>MovLimit || fabs(float(movz))>MovLimit);
   //-Aplica desplazamiento.
-  //rpos.x+=movx; rpos.y+=movy; rpos.z+=movz; // removed for fixed particles 
+  rpos.x+=movx; rpos.y+=movy; rpos.z+=movz; // removed for fixed particles 
   //-Check limits of real domain / Comprueba limites del dominio reales.
   double dx=rpos.x-MapRealPosMin.x;
   double dy=rpos.y-MapRealPosMin.y;
@@ -2241,7 +2359,7 @@ void JSphCpu::UpdatePos(tdouble3 rpos,double movx,double movy,double movz
     bool outy=!yperi && (dy<0 || dy>=MapRealSize.y);
     bool outz=!zperi && (dz<0 || dz>=MapRealSize.z);
     out=(outx||outy||outz);
-    //rpos=TDouble3(dx,dy,dz)+MapRealPosMin;  // removed for fixed particles hopefully
+    rpos=TDouble3(dx,dy,dz)+MapRealPosMin;  // removed for fixed particles hopefully
   }
   //-Keep currnt position / Guarda posicion actualizada.
   pos[p]=rpos;
@@ -2489,9 +2607,9 @@ double JSphCpu::DtVariable(bool final){
   //-dt1 depends on force per unit mass.
   const double dt1=(AceMax? (sqrt(double(H)/AceMax)): DBL_MAX); 
   //-dt2 combines the Courant and the viscous time-step controls.
-  const double dt2=double(H)/(max(Cs0,VelMax*10.)+double(H)*ViscDtMax);
+  const double dt2=double(H)/30;//(max(Cs0,VelMax*10.)+double(H)*ViscDtMax); // changed to give a fixed timestep
   //-dt new value of time step.
-  double dt=double(CFLnumber)*min(dt1,dt2);
+  double dt=double(CFLnumber)*min(dt2,dt2);
   if(DtFixed)dt=DtFixed->GetDt(float(TimeStep),float(dt));
   if(dt<double(DtMin)){ dt=double(DtMin); DtModif++; }
   if(SaveDt && final)SaveDt->AddValues(TimeStep,dt,dt1*CFLnumber,dt2*CFLnumber,AceMax,ViscDtMax,VelMax);

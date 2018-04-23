@@ -818,6 +818,161 @@ void JSphCpuSingle::RunFloating(double dt,bool predictor){
   }
 }
 
+//==============================================================================                    SHABA
+// function to find the nearest fluid particle to a boundary particle and therfore 
+// find the normal to the boundary.
+// Function looks the surrounding fluid particles to a boundary particle and
+// calculates the distance between them. The idp of the nearest particle is stored
+// and returned.
+//==============================================================================
+unsigned JSphCpuSingle::FluidHunter(unsigned p1, const tdouble3 *Posc)const
+{
+	// get the location of the boundary particle
+	tdouble3 boundary=Posc[p1];
+
+	//cout << idp[pcopy] << "\t" << pos[pcopy].x << "\t" << pos[pcopy].y << "\t" << pos[pcopy].z << endl;
+
+	unsigned fluid=0;
+	double distance=10;
+	for(unsigned p2=Npb;p2<Np;p2++){
+		double dx=Posc[p2].x-boundary.x;
+		double dy=Posc[p2].y-boundary.y;
+		double dz=Posc[p2].z-boundary.z;
+
+		double radius=sqrt(dx*dx + dy*dy + dz*dz);
+		if(radius<=distance){
+			distance=radius;
+			fluid = p2;
+			//cout << fluid << "\t" << distance << endl;
+			
+		}
+	}
+
+	return fluid;
+}
+
+//==============================================================================                    SHABA
+// function to find the nearest fluid particle to a boundary particle and therfore 
+// find the normal to the boundary.
+// Function looks the surrounding fluid particles to a boundary particle and
+// calculates the distance between them. The idp of the nearest particle is stored
+// and returned.
+//==============================================================================
+unsigned JSphCpuSingle::BoundaryHunter(unsigned Fluid, const tdouble3 *Posc)const
+{
+	// get the location of the boundary particle
+	tdouble3 fluid=Posc[Fluid];
+
+	//cout << idp[pcopy] << "\t" << pos[pcopy].x << "\t" << pos[pcopy].y << "\t" << pos[pcopy].z << endl;
+  
+	unsigned boundary=0;
+	double distance=10;
+	for(unsigned p2=0;p2<Npb;p2++){
+		double dx=Posc[p2].x-fluid.x;
+		double dy=Posc[p2].y-fluid.y;
+		double dz=Posc[p2].z-fluid.z;
+
+		double radius=sqrt(dx*dx + dy*dy + dz*dz);
+		if(radius<=distance){
+			distance=radius;
+			boundary = p2;
+			//cout << fluid << "\t" << distance << endl;
+			
+		}
+	}
+
+	return boundary;
+}
+
+//=================================================================================                     SHABA
+// Function to find the normal componants to a boundary for the placement of Marrone
+// Boundary Particles. The normal found is the normal pointing into the fluid from the 
+// the boundary. Using this normal Marrone probe particles can be placed along this 
+// normal along with the correct distance from the physical boundary.
+//=================================================================================
+void JSphCpuSingle::NormalHunter(unsigned p1, tdouble3 *Posc, float &nx, float &ny, float &nz)const
+{
+	// get the location of the boundary particle
+	tdouble3 bound=Posc[p1]; // bound is the position of the boundary particle
+
+	// get idp of the nearest fluid particle
+	unsigned fluid = FluidHunter(p1, Posc); // fluid is the nearest fluid particle to bound
+	unsigned boundary=BoundaryHunter(fluid, Posc); // boundary is the nearest physical boundary particle to fluid
+	tdouble3 boundary3=Posc[boundary];
+
+	double xd=boundary3.x-bound.x;
+	double yd=boundary3.y-bound.y;
+	double zd=boundary3.z-bound.z;
+
+	// these normal point from the boundary particle to the physical boundary into the fluid
+	nx=SignHunter(xd);
+	ny=SignHunter(yd);
+	nz=SignHunter(zd);
+}
+
+//==============================================================================                        SHABA
+// Function to find the sign of a number. If the number is positive the function 
+// returns 1, if it is negative the function returns -1. If the number is zero the 
+// function returns 1.
+//==============================================================================
+float JSphCpuSingle::SignHunter(double number)const
+{
+	float norm=0;
+	float zero=0;
+	if(number>zero){
+		norm=1;}
+	if(number<zero){
+		norm=-1;}
+	
+	return norm;
+}
+
+
+//==============================================================================
+// Function to set the density of all particles to 1000, set the mass of physical
+// boundary paricles to zero and move the boundary particles behind the physical
+// boundary dp/2 closer to the fluid for use by the Marrone boundary particle
+// method
+//==============================================================================                 SHABA
+void JSphCpuSingle::Alterations(){
+
+	// Setting all the particle densities to the reference density for the flow                     SHABA
+	for( unsigned p=0;p<Np;p++){
+		Velrhopc[p].w = RhopZero;
+	}
+
+	// Giving the fluid particles analytical velocity
+	/*for (unsigned p=Npb;p<Np;p++) 
+	{
+		Velrhopc[p].x = 4.0*(0.5*0.5 + 2.0*0.01*0.5 - Posc[p].z*Posc[p].z);
+		Velrhopc[p].y=0.0;
+		Velrhopc[p].z=0.0;
+	}*/
+
+	// moving boundary particles dp/2 away from the fluid
+	for (unsigned p=0;p<Npb;p++)
+	{
+		double z = SignHunter(Posc[p].z);
+		
+		Posc[p].z += z*Dp/2;
+	}
+
+	// moving the all fluid particles up by dp/2 and the fluid particle outside of the channel into the channel
+	for(unsigned p=Npb;p<Np;p++)
+	{
+		Posc[p].z += Dp/2;
+
+		if(Posc[p].z<=-0.6)
+		{
+			Posc[p].z = -0.5+Dp/2;
+		}
+
+	}
+
+
+
+}
+
 //==============================================================================
 /// Inicia proceso de simulacion.
 /// Initial processing of simulation.
@@ -849,11 +1004,8 @@ void JSphCpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
   TmcResetValues(Timers);
   TmcStop(Timers,TMC_Init);
   PartNstep=-1; Part++;
-	// Setting all the particle densities to the reference density for the flow                     SHABA
-	for( unsigned p=0;p<Np;p++){
-		Velrhopc[p].w = RhopZero;
-	}
 	
+	Alterations(); // SHABA
 
   //-Main Loop / Bucle principal
   //------------------

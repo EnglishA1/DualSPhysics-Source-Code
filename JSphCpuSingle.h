@@ -75,6 +75,13 @@ protected:
   void SaveData();
   void FinishRun(bool stop);
 
+	// New function for moving boundary particles for marrone Conditions SHABA
+	unsigned FluidHunter(unsigned p1, const tdouble3 *Posc)const;
+	unsigned BoundaryHunter(unsigned Fluid, const tdouble3 *Posc)const;
+	void NormalHunter(unsigned p1, tdouble3 *Posc, float &nx, float &ny, float &nz)const;
+	float SignHunter(double number)const;
+	void Alterations();
+
 public:
   JSphCpuSingle();
   ~JSphCpuSingle();
