@@ -1233,17 +1233,17 @@ void JSphCpu::VelocityGradient(unsigned p1, tdouble3 PSProbe, tfloat3 PSProbeVel
 					float vij = float(PSProbeVel.y - velrhop[p2].y);
 					float wij = float(PSProbeVel.z - velrhop[p2].z);
 
-					ux+=-(m2/velrhop[p2].w)*uij*frx;
-					uy+=-(m2/velrhop[p2].w)*uij*fry;
+					//ux+=-(m2/velrhop[p2].w)*uij*frx;
+					//uy+=-(m2/velrhop[p2].w)*uij*fry;
 					uz+=-(m2/velrhop[p2].w)*uij*frz;
 
-					vx+=-(m2/velrhop[p2].w)*vij*frx;
-					vy+=-(m2/velrhop[p2].w)*vij*fry;
-				  vz+=-(m2/velrhop[p2].w)*vij*frz;
+					//vx+=-(m2/velrhop[p2].w)*vij*frx;
+					//vy+=-(m2/velrhop[p2].w)*vij*fry;
+				  //vz+=-(m2/velrhop[p2].w)*vij*frz;
 
-					wx+=-(m2/velrhop[p2].w)*wij*frx;
-					wy+=-(m2/velrhop[p2].w)*wij*fry;
-					wz+=-(m2/velrhop[p2].w)*wij*frz;
+					//wx+=-(m2/velrhop[p2].w)*wij*frx;
+					//wy+=-(m2/velrhop[p2].w)*wij*fry;
+					//wz+=-(m2/velrhop[p2].w)*wij*frz;
 
 			
 						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
@@ -1279,17 +1279,17 @@ void JSphCpu::VelocityGradient(unsigned p1, tdouble3 PSProbe, tfloat3 PSProbeVel
 					float vij = float(PSProbeVel.y - velrhop[p2].y);
 					float wij = float(PSProbeVel.z - velrhop[p2].z);
 
-					ux+=-(m2/velrhop[p2].w)*uij*frx;
-					uy+=-(m2/velrhop[p2].w)*uij*fry;
+					//ux+=-(m2/velrhop[p2].w)*uij*frx;
+					//uy+=-(m2/velrhop[p2].w)*uij*fry;
 					uz+=-(m2/velrhop[p2].w)*uij*frz;
 
-					vx+=-(m2/velrhop[p2].w)*vij*frx;
-					vy+=-(m2/velrhop[p2].w)*vij*fry;
-					vz+=-(m2/velrhop[p2].w)*vij*frz;
+					//vx+=-(m2/velrhop[p2].w)*vij*frx;
+					//vy+=-(m2/velrhop[p2].w)*vij*fry;
+					//vz+=-(m2/velrhop[p2].w)*vij*frz;
 
-					wx+=-(m2/velrhop[p2].w)*wij*frx;
-					wy+=-(m2/velrhop[p2].w)*wij*fry;
-					wz+=-(m2/velrhop[p2].w)*wij*frz;
+					//wx+=-(m2/velrhop[p2].w)*wij*frx;
+					//wy+=-(m2/velrhop[p2].w)*wij*fry;
+					//wz+=-(m2/velrhop[p2].w)*wij*frz;
 
 			
 						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
@@ -1442,7 +1442,7 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 	PSProbe.y += ny*Dp/2;
 	PSProbe.z += nz*Dp/2;
 
-	tfloat3 PSProbeVel;
+	tfloat3 PSProbeVel = TFloat3(0,0,0);
 	BoundaryVel(PSProbe, PSProbeVel, pos, velrhop);
 
 
@@ -1491,14 +1491,14 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   #endif*/
 
 	// Partial Slip Calculations
-									/*float b=0.01f; // SLIP LENGTH
+									float b=0.01f; // SLIP LENGTH
 									for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
 									{
 											float SlipVelx=0, SlipVely=0, SlipVelz=0;
 											PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
 											//  This loop calculates the partial slip velocities
 		
-									}*/
+									}
 
 									// Marrone Particle calculations  SHABA
 									for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
@@ -1506,7 +1506,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 											InteractionForcesMarrone(p1, pos, velrhop, idp, press, code); 
 											// This loop calculates the velocity for the marrone boundary particles and gives the boundary particles this velocity
 											
-													//velrhop[p1].x += 2*SlipVel[p1].x;
+													velrhop[p1].x += 2*SlipVel[p1].x;
 													//velrhop[p1].y += SlipVel[p1].y;
 												//	velrhop[p1].z += SlipVel[p1].z;
 													//   This loop adds the partial slip contribution to the boundary particle in the same way as a wall velocity
