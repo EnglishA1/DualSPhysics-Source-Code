@@ -762,7 +762,8 @@ float JSphCpu::GetKernelWab(float drx,float dry,float drz)const{
 // Function to calculate the velocities, pressure and density of a boundary particle
 // using the Adami boundary method. This will be slow and could very probably be sped up
 //==============================================================================
-void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, float *press, float &Adamix, float &Adamiy, float &Adamiz, float &Adamipress, float &AdamiRhop, const unsigned *idp)const
+void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, float *press, float &Adamix, float &Adamiy, float &Adamiz, float &Adamipress, float &AdamiRhop, const unsigned *idp,
+	tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
 {
 
 	tdouble3 PosBound = pos[p2];
@@ -770,7 +771,19 @@ void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, floa
 	float presx=0,presy=0,presz=0;
 	//cout << pos[p2].x << "\t" << pos[p2].y << "\t" << pos[p2].z << endl;
 
-	for(unsigned p1=Npb;p1<Np;p1++){
+	int cxini,cxfin,yini,yfin,zini,zfin;
+  GetInteractionCells(dcell[p2],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
+
+  //-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
+  for(int z=zini;z<zfin;z++){
+    const int zmod=(nc.w)*z+cellinitial; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
+    for(int y=yini;y<yfin;y++){
+      int ymod=zmod+nc.x*y;
+      const unsigned pini=beginendcell[cxini+ymod];
+      const unsigned pfin=beginendcell[cxfin+ymod];
+	
+			for( unsigned p1=pini; p1<pfin;p1++)
+			{
           const float drx=float(PosBound.x-pos[p1].x);
           const float dry=float(PosBound.y-pos[p1].y);
           const float drz=float(PosBound.z-pos[p1].z);
@@ -788,10 +801,16 @@ void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, floa
 						presz += velrhop[p1].w*drz*GetKernelWab(drx, dry, drz);
 
 					}
+			}
+		}
 	}
+
+	float nx=0, ny=0, nz=0;
+	NormalHunter(p2, pos, idp, nx, ny, nz);
+	
 	Adamix = -Adamix/kernel;
 	Adamiy = -Adamiy/kernel;
-	Adamiz = -Adamiz/kernel;
+	Adamiz = nz*fabs(Adamiz/kernel);
 
 	Adamipress = (Adamipress +Gravity.x*presx + Gravity.y*presy + Gravity.z*presz)/kernel;
 
@@ -807,7 +826,7 @@ void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, floa
 		Adamipress=CteB*(pow(AdamiRhop/RhopZero,Gamma)-1.0f);  
 	}
 
-	unsigned bound = IsBoundGeneral(p2,pos,idp);
+	/*unsigned bound = IsBoundGeneral(p2,pos,idp);
 	if(p2==bound)
 	{
 		Adamix = 0;
@@ -815,7 +834,7 @@ void JSphCpu::AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, floa
 		Adamiz = 0;
 		AdamiRhop = RhopZero;
 		Adamipress=CteB*(pow(AdamiRhop/RhopZero,Gamma)-1.0f);  
-	}
+	}*/
 
 		
 }
@@ -1257,25 +1276,20 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 	{
 			float SlipVelx=0, SlipVely=0, SlipVelz=0;
 			PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
-		
-			bool PerryCox = false;
-							PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
-							if(!PerryCox){
-							// defining the Adami parameters and doing the calculation if p2 is a boundary particle
-							float Adamix=0, Adamiy=0, Adamiz=0, Adamipress=0, AdamiRhop=0;
-							AdamiCalc(p1,pos,velrhop,press,Adamix,Adamiy,Adamiz,Adamipress,AdamiRhop,idp);	
-							AdamiVel[p1].x = Adamix;
-							AdamiVel[p1].y = Adamiy;
-							AdamiVel[p1].z = Adamiz;
-							AdamiVel[p1].w = AdamiRhop;
-							AdamiPress[p1] = Adamipress;
+			
+			// defining the Adami parameters and doing the calculation if p2 is a boundary particle
+			float Adamix=0, Adamiy=0, Adamiz=0, Adamipress=0, AdamiRhop=0;
+			AdamiCalc(p1,pos,velrhop,press,Adamix,Adamiy,Adamiz,Adamipress,AdamiRhop,idp, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);	
+			AdamiVel[p1].x = Adamix;
+			AdamiVel[p1].y = Adamiy;
+			AdamiVel[p1].z = Adamiz;
+			AdamiVel[p1].w = AdamiRhop;
+			AdamiPress[p1] = Adamipress;
 
-							velrhop[p1].w = AdamiVel[p1].w;
-							press[p1] = AdamiPress[p1];
-							}
+			velrhop[p1].w = AdamiVel[p1].w;
+			press[p1] = AdamiPress[p1];
+							
 	}
-
-	
 
 	for (unsigned p1=0;p1<Npb;p1++) // assigning particles velocities according to Adami and partial slip
 	{
@@ -2318,7 +2332,7 @@ double JSphCpu::DtVariable(bool final){
   //-dt1 depends on force per unit mass.
   const double dt1=(AceMax? (sqrt(double(H)/AceMax)): DBL_MAX); 
   //-dt2 combines the Courant and the viscous time-step controls.
-  const double dt2=double(H)/50;/*(max(Cs0,VelMax*10.)+double(H)*ViscDtMax);*/
+  const double dt2=double(H)/30;/*(max(Cs0,VelMax*10.)+double(H)*ViscDtMax);*/
   //-dt new value of time step.
   double dt=double(CFLnumber)*min(dt2,dt2);
   if(DtFixed)dt=DtFixed->GetDt(float(TimeStep),float(dt));

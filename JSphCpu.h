@@ -166,7 +166,8 @@ protected:
 	// New Adami calculation                      SHABA
 	tfloat4 *AdamiVel;
 	float *AdamiPress;
-	void AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, float *press, float &Adamix, float &Adamiy, float &Adamiz, float &AdamiPress, float &AdamiRhop, const unsigned *idp)const;
+	void AdamiCalc(unsigned p2, const tdouble3 *pos, tfloat4 *velrhop, float *press, float &Adamix, float &Adamiy, float &Adamiz, float &AdamiPress, float &AdamiRhop, const unsigned *idp,
+		tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const;
 	unsigned Bouncer(unsigned PartID, const word *code, const unsigned *idp) const;
 	inline float GetKernelWab(float drx,float dry,float drz)const;     
 
