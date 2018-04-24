@@ -1235,7 +1235,7 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 	PSProbe.y += ny*Dp/2;
 	PSProbe.z += nz*Dp/2;
 
-	tfloat3 PSProbeVel;
+	tfloat3 PSProbeVel = TFloat3(0,0,0);
 	BoundaryVel(PSProbe, PSProbeVel, pos, velrhop);
 
 
