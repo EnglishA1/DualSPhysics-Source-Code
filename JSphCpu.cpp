@@ -1400,27 +1400,71 @@ unsigned JSphCpu::IsBound(unsigned p1, const tdouble3 *pos, const unsigned *idp)
 // Function to find the velocity at the imaginary boundary line to be used in 
 // the partial slip calulation
 //================================================================================
-void JSphCpu::BoundaryVel(tdouble3 PSProbe, tfloat3 &PSProbeVel, const tdouble3 *pos, const tfloat4 *velrhop)const
+void JSphCpu::BoundaryVel(unsigned Bound, tdouble3 PSProbe, tfloat3 &PSProbeVel, const tdouble3 *pos, const tfloat4 *velrhop,tint4 nc,
+	int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const
 {
 
-	for( unsigned p2=0; p2<Np;p2++)
-	{
-		const float drx = float(PSProbe.x - pos[p2].x);
-		const float dry = float(PSProbe.y - pos[p2].y);
-		const float drz = float(PSProbe.z - pos[p2].z);
-		const float rr2 = drx*drx + dry*dry + drz*drz;
+	int cxini,cxfin,yini,yfin,zini,zfin;
+  GetInteractionCells(dcell[Bound],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
 
-		if(rr2<=Fourh2 && rr2>=ALMOSTZERO)
-		{
-			float massp2 = MassFluid;
+  //-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
+  for(int z=zini;z<zfin;z++){
+    const int zmod=(nc.w)*z+cellinitial; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
+    for(int y=yini;y<yfin;y++){
+      int ymod=zmod+nc.x*y;
+      const unsigned pini=beginendcell[cxini+ymod];
+      const unsigned pfin=beginendcell[cxfin+ymod];
+	
+			for( unsigned p2=pini; p2<pfin;p2++)
+			{
+				const float drx = float(PSProbe.x - pos[p2].x);
+				const float dry = float(PSProbe.y - pos[p2].y);
+				const float drz = float(PSProbe.z - pos[p2].z);
+				const float rr2 = drx*drx + dry*dry + drz*drz;
 
-			PSProbeVel.x += (massp2/velrhop[p2].w)*velrhop[p2].x*GetKernelWab(drx,dry,drz);
-			PSProbeVel.y += (massp2/velrhop[p2].w)*velrhop[p2].y*GetKernelWab(drx,dry,drz);
-			PSProbeVel.z += (massp2/velrhop[p2].w)*velrhop[p2].z*GetKernelWab(drx,dry,drz);
+				if(rr2<=Fourh2 && rr2>=ALMOSTZERO)
+				{
+					float massp2 = MassFluid;
 
+					PSProbeVel.x += (massp2/velrhop[p2].w)*velrhop[p2].x*GetKernelWab(drx,dry,drz);
+					PSProbeVel.y += (massp2/velrhop[p2].w)*velrhop[p2].y*GetKernelWab(drx,dry,drz);
+					PSProbeVel.z += (massp2/velrhop[p2].w)*velrhop[p2].z*GetKernelWab(drx,dry,drz);
+
+				}
+
+			}
 		}
-
 	}
+
+
+	for(int z=zini;z<zfin;z++){
+    const int zmod=(nc.w)*z+0; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
+    for(int y=yini;y<yfin;y++){
+      int ymod=zmod+nc.x*y;
+      const unsigned pini=beginendcell[cxini+ymod];
+      const unsigned pfin=beginendcell[cxfin+ymod];
+	
+			for( unsigned p2=pini; p2<pfin;p2++)
+			{
+				const float drx = float(PSProbe.x - pos[p2].x);
+				const float dry = float(PSProbe.y - pos[p2].y);
+				const float drz = float(PSProbe.z - pos[p2].z);
+				const float rr2 = drx*drx + dry*dry + drz*drz;
+
+				if(rr2<=Fourh2 && rr2>=ALMOSTZERO)
+				{
+					float massp2 = MassFluid;
+
+					PSProbeVel.x += (massp2/velrhop[p2].w)*velrhop[p2].x*GetKernelWab(drx,dry,drz);
+					PSProbeVel.y += (massp2/velrhop[p2].w)*velrhop[p2].y*GetKernelWab(drx,dry,drz);
+					PSProbeVel.z += (massp2/velrhop[p2].w)*velrhop[p2].z*GetKernelWab(drx,dry,drz);
+
+				}
+
+			}
+		}
+	}
+
 }
 
 //================================================================================                                    SHABA
@@ -1443,7 +1487,7 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 	PSProbe.z += nz*Dp/2;
 
 	tfloat3 PSProbeVel = TFloat3(0,0,0);
-	BoundaryVel(PSProbe, PSProbeVel, pos, velrhop);
+	BoundaryVel(Bound, PSProbe, PSProbeVel, pos, velrhop, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
 
 
 	VelocityGradient(Bound, PSProbe, PSProbeVel, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell,idp);
