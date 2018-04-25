@@ -1228,6 +1228,35 @@ void JSphCpu::BoundaryVel( unsigned Bound, tdouble3 PSProbe, tfloat3 &PSProbeVel
 			}
 		}
 	}
+
+	//-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
+  for(int z=zini;z<zfin;z++){
+    const int zmod=(nc.w)*z+0; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
+    for(int y=yini;y<yfin;y++){
+      int ymod=zmod+nc.x*y;
+      const unsigned pini=beginendcell[cxini+ymod];
+      const unsigned pfin=beginendcell[cxfin+ymod];
+	
+			for( unsigned p2=pini; p2<pfin;p2++)
+			{
+				const float drx = float(PSProbe.x - pos[p2].x);
+				const float dry = float(PSProbe.y - pos[p2].y);
+				const float drz = float(PSProbe.z - pos[p2].z);
+				const float rr2 = drx*drx + dry*dry + drz*drz;
+
+				if(rr2<=Fourh2 && rr2>=ALMOSTZERO)
+				{
+					float massp2 = MassFluid;
+
+					PSProbeVel.x += (massp2/velrhop[p2].w)*velrhop[p2].x*GetKernelWab(drx,dry,drz);
+					PSProbeVel.y += (massp2/velrhop[p2].w)*velrhop[p2].y*GetKernelWab(drx,dry,drz);
+					PSProbeVel.z += (massp2/velrhop[p2].w)*velrhop[p2].z*GetKernelWab(drx,dry,drz);
+
+				}
+
+			}
+		}
+	}
 }
 
 //================================================================================                                    SHABA
@@ -1285,7 +1314,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 
 	//============================================================================================SHABA
 	// Partial Slip Calculations
-	float b=0.005f; // SLIP LENGTH
+	float b=0.01f; // SLIP LENGTH
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity and Adami Velocity
 	{
 			float SlipVelx=0, SlipVely=0, SlipVelz=0;
