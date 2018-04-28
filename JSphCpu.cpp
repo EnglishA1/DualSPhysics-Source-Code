@@ -1467,6 +1467,126 @@ void JSphCpu::BoundaryVel(unsigned Bound, tdouble3 PSProbe, tfloat3 &PSProbeVel,
 
 }
 
+//===============================================================================                                    SHABA
+// Function to calculate the velocity gradient used in the Partial slip boundary 
+// condition summing over all surrounding fluid and boundary particles
+//===============================================================================
+void JSphCpu::VelocityGradientNew(unsigned p1, tdouble3 PSProbe, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
+	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell, const unsigned *idp)const
+{
+	
+					//		cout << p1 << "\t" <<  pos[p1].x << "\t" <<  pos[p1].y << "\t" <<  pos[p1].z << endl;
+	
+	float ux=0, uy=0, uz=0;
+	float vx=0, vy=0, vz=0;
+	float wx=0, wy=0, wz=0;
+	 //-Obtain limits of interaction / Obtiene limites de interaccion
+  int cxini,cxfin,yini,yfin,zini,zfin;
+  GetInteractionCells(dcell[p1],hdiv,nc,cellzero,cxini,cxfin,yini,yfin,zini,zfin);
+
+  //-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
+  for(int z=zini;z<zfin;z++){
+    const int zmod=(nc.w)*z+cellinitial; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
+    for(int y=yini;y<yfin;y++){
+      int ymod=zmod+nc.x*y;
+      const unsigned pini=beginendcell[cxini+ymod];
+      const unsigned pfin=beginendcell[cxfin+ymod];
+	
+			for( unsigned p2=pini; p2<pfin;p2++)
+			{
+				const float drx=float(PSProbe.x-pos[p2].x);
+				const float dry=float(PSProbe.y-pos[p2].y);
+				const float drz=float(PSProbe.z-pos[p2].z);
+				const float rr2=drx*drx+dry*dry+drz*drz;
+					if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+						
+							//cout << " First loop" << endl;
+							//cout << p2 << "\t" <<  pos[p2].x << "\t" <<  pos[p2].y << "\t" <<  pos[p2].z << endl;
+						
+					float frx,fry,frz;
+					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
+					float m2=MassFluid;
+					
+					float uij = float(velrhop[p2].x);
+					float vij = float(velrhop[p2].y);
+					float wij = float(velrhop[p2].z);
+
+					//ux+=-(m2/velrhop[p2].w)*uij*frx;
+					//uy+=-(m2/velrhop[p2].w)*uij*fry;
+					uz+=(m2/velrhop[p2].w)*uij*frz;
+
+					//vx+=-(m2/velrhop[p2].w)*vij*frx;
+					//vy+=-(m2/velrhop[p2].w)*vij*fry;
+				  //vz+=-(m2/velrhop[p2].w)*vij*frz;
+
+					//wx+=-(m2/velrhop[p2].w)*wij*frx;
+					//wy+=-(m2/velrhop[p2].w)*wij*fry;
+					//wz+=-(m2/velrhop[p2].w)*wij*frz;
+
+			
+						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
+					}
+			}
+		}
+	}
+
+	//-Search for neighbours in adjacent cells / Busqueda de vecinos en celdas adyacentes.
+	for(int z=zini;z<zfin;z++){
+    const int zmod=(nc.w)*z+0; //-Sum from start of fluid cells / Le suma donde empiezan las celdas de fluido.
+    for(int y=yini;y<yfin;y++){
+      int ymod=zmod+nc.x*y;
+      const unsigned pini=beginendcell[cxini+ymod];
+      const unsigned pfin=beginendcell[cxfin+ymod];
+	
+			for( unsigned p2=pini; p2<pfin;p2++)
+			{
+				const float drx=float(PSProbe.x-pos[p2].x);
+				const float dry=float(PSProbe.y-pos[p2].y);
+				const float drz=float(PSProbe.z-pos[p2].z);
+				const float rr2=drx*drx+dry*dry+drz*drz;
+					if(rr2<=Fourh2 && rr2>=ALMOSTZERO){
+						
+						//	cout << "Second loop" << endl;
+						//	cout << p2 << "\t" <<  pos[p2].x << "\t" <<  pos[p2].y << "\t" <<  pos[p2].z << endl;
+						
+					float frx,fry,frz;
+					GetKernel(rr2,drx,dry,drz,frx,fry,frz); // Wendland Kernel
+					float m2=MassFluid;
+					
+					float uij = float(velrhop[p2].x);
+					float vij = float(velrhop[p2].y);
+					float wij = float(velrhop[p2].z);
+
+					//ux+=-(m2/velrhop[p2].w)*uij*frx;
+					//uy+=-(m2/velrhop[p2].w)*uij*fry;
+					uz+=(m2/velrhop[p2].w)*uij*frz;
+
+					//vx+=-(m2/velrhop[p2].w)*vij*frx;
+					//vy+=-(m2/velrhop[p2].w)*vij*fry;
+					//vz+=-(m2/velrhop[p2].w)*vij*frz;
+
+					//wx+=-(m2/velrhop[p2].w)*wij*frx;
+					//wy+=-(m2/velrhop[p2].w)*wij*fry;
+					//wz+=-(m2/velrhop[p2].w)*wij*frz;
+
+			
+						//cout << "HERE      " << Idpc[p1] << "\t" << uz << "\t" << nz<< endl;
+					}
+			}
+		}
+	}
+
+	
+
+	SlipVelx = ((2*ux)*nx + (uy + vx)*ny + (uz + wx)*nz);
+	SlipVely = ((uy + vx)*nx + (2*vy)*ny + (vz + wy)*nz);
+	SlipVelz = ((uz + wx)*nx + (vz + wy)*ny + (2*wz)*nz);
+
+	//cout << p1 <<"\t"<< pos[p1].x <<"\t"<< pos[p1].y <<"\t"<< pos[p1].z << endl <<"p1"<< "\t"<<SlipVelx <<"\t"<< SlipVely <<"\t"<< SlipVelz << endl;
+}
+
+
+
 //================================================================================                                    SHABA
 // Function to find the partilces on the physical boundary, find the normals to the boundary 
 // and calculate the partial slip velocity at these boundary particles
@@ -1486,13 +1606,14 @@ void JSphCpu::PartialSlipCalc(unsigned p1, float &SlipVelx, float &SlipVely, flo
 	PSProbe.y += ny*Dp/2;
 	PSProbe.z += nz*Dp/2;
 
-	tfloat3 PSProbeVel = TFloat3(0,0,0);
+	/*tfloat3 PSProbeVel = TFloat3(0,0,0);
 	BoundaryVel(Bound, PSProbe, PSProbeVel, pos, velrhop, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
 
+	VelocityGradient(Bound, PSProbe, PSProbeVel, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell,idp);*/
 
-	VelocityGradient(Bound, PSProbe, PSProbeVel, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell,idp);
-
+	VelocityGradientNew(Bound, PSProbe, pos, velrhop, SlipVelx, SlipVely, SlipVelz, nx, ny, nz, b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell,idp);
 	
+
 	SlipVel[p1].x = b*SlipVelx;
 	SlipVel[p1].y = b*SlipVely;
 	SlipVel[p1].z = b*SlipVelz;
@@ -1554,6 +1675,22 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 													//velrhop[p1].y += SlipVel[p1].y;
 												//	velrhop[p1].z += SlipVel[p1].z;
 													//   This loop adds the partial slip contribution to the boundary particle in the same way as a wall velocity
+													
+													// loops for finding the shear stress at the boundary. in post processing divide by b and multiply by mu
+													if(pos[p1].z>=0.8)
+													{
+														velrhop[p1].x = SlipVel[p1].x;
+														velrhop[p1].y = 0.0;
+														velrhop[p1].z = 0.0;
+													}
+
+													if(pos[p1].z<=-0.8)
+													{
+														velrhop[p1].x = SlipVel[p1].x;
+														velrhop[p1].y = 0.0;
+														velrhop[p1].z = 0.0;
+													}
+
 											
 									}
 									
