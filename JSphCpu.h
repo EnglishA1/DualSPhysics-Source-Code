@@ -187,6 +187,8 @@ protected:
 		,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const;
 	void BoundaryVel(unsigned Bound, tdouble3 PSProbe, tfloat3 &PSProbeVel, const tdouble3 *pos, const tfloat4 *velrhop
 		,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell)const;
+	void VelocityGradientNew(unsigned p1, tdouble3 PSProbe, const tdouble3 *pos, tfloat4 *velrhop, float &SlipVelx, float &SlipVely, float &SlipVelz, float nx, float ny, float nz, float b
+	,tint4 nc,int hdiv,unsigned cellinitial,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell, const unsigned *idp)const;
 	//================================================================================================
 
 
