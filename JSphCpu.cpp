@@ -1437,7 +1437,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 
 	//============================================================================================SHABA
 	// Partial Slip Calculations
-	float b=0.0f; // SLIP LENGTH
+	float b=0.01f; // SLIP LENGTH
 	for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity and Adami Velocity
 	{
 			float SlipVelx=0, SlipVely=0, SlipVelz=0;
@@ -2512,7 +2512,7 @@ double JSphCpu::DtVariable(bool final){
   //-dt1 depends on force per unit mass.
   const double dt1=(AceMax? (sqrt(double(H)/AceMax)): DBL_MAX); 
   //-dt2 combines the Courant and the viscous time-step controls.
-  const double dt2=double(H)/30;/*(max(Cs0,VelMax*10.)+double(H)*ViscDtMax);*/
+  const double dt2=double(H)/30;//(max(Cs0,30./*VelMax*10.*/)+double(H)*ViscDtMax);
   //-dt new value of time step.
   double dt=double(CFLnumber)*min(dt2,dt2);
   if(DtFixed)dt=DtFixed->GetDt(float(TimeStep),float(dt));
