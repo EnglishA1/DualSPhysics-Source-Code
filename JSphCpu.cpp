@@ -2515,7 +2515,7 @@ void JSphCpu::UpdatePos(tdouble3 rpos,double movx,double movy,double movz
   //-Check validity of displacement / Comprueba validez del desplazamiento.
   bool outmove=(fabs(float(movx))>MovLimit || fabs(float(movy))>MovLimit || fabs(float(movz))>MovLimit);
   //-Aplica desplazamiento.
-  rpos.x+=movx; rpos.y+=movy; rpos.z+=movz; // removed for fixed particles 
+  //rpos.x+=movx; rpos.y+=movy; rpos.z+=movz; // removed for fixed particles 
   //-Check limits of real domain / Comprueba limites del dominio reales.
   double dx=rpos.x-MapRealPosMin.x;
   double dy=rpos.y-MapRealPosMin.y;
@@ -2540,7 +2540,7 @@ void JSphCpu::UpdatePos(tdouble3 rpos,double movx,double movy,double movz
     bool outy=!yperi && (dy<0 || dy>=MapRealSize.y);
     bool outz=!zperi && (dz<0 || dz>=MapRealSize.z);
     out=(outx||outy||outz);
-    rpos=TDouble3(dx,dy,dz)+MapRealPosMin;  // removed for fixed particles hopefully
+    //rpos=TDouble3(dx,dy,dz)+MapRealPosMin;  // removed for fixed particles hopefully
   }
   //-Keep currnt position / Guarda posicion actualizada.
   pos[p]=rpos;
