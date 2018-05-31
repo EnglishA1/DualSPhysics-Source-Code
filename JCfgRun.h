@@ -1,24 +1,27 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file JCfgRun.h \brief Declares the class \ref JCfgRun.
 
 #ifndef _JCfgRun_
 #define _JCfgRun_
+
+#pragma warning(disable : 4996) //Cancels sprintf() deprecated.
 
 #include "Types.h"
 #include "Functions.h"
@@ -32,7 +35,7 @@
 //##############################################################################
 //# JCfgRun
 //##############################################################################
-/// \brief Defines the class responsible for collecting the execution parameters by command line.
+/// \brief Defines the class responsible of collecting the execution parameters by command line.
 
 class JCfgRun : protected JObject
 {
@@ -40,9 +43,6 @@ public:
 protected:
   bool SvDef;
   int DirsDef;
-  static void LoadDouble3(std::string txopt,double def,tdouble3 &v1);
-  static void LoadFloat3(std::string txopt,float def,tfloat3 &v1);
-  static void LoadDouble6(std::string txopt,double def,tdouble3 &v1,tdouble3 &v2);
   static void LoadFloat6(std::string txopt,float def,tfloat3 &v1,tfloat3 &v2);
 
 public:
@@ -52,37 +52,36 @@ public:
   int GpuId;
   bool GpuFree;
   bool Stable;
-  int PosDouble;  ///<Precision in particle interaction. 0:Simple, 1:Double, 2:Uses and save double (default=0).
 
   int OmpThreads;
-  TpBlockSizeMode BlockSizeMode;
+  TpOmpMode OmpMode;
 
   TpCellOrder CellOrder;
-  TpCellMode  CellMode;
+  TpCellMode  CellMode;           ///<Modes of cells division.
   TpStep TStep;
   int VerletSteps;
   TpKernel TKernel;
   TpVisco TVisco;
   float Visco;
-  float ViscoBoundFactor;
-  double TimeMax,TimePart;
+  float TimeMax,TimePart;
+  int ShepardSteps;
   float DeltaSph;
-  int Shifting; //-Shifting mode -1:sin definir, 0:none, 1:nobound, 2:nofixed, 3:full
   bool SvRes,SvTimers,SvDomainVtk;
-  bool Sv_Binx,Sv_Info,Sv_Csv,Sv_Vtk;
+  bool Sv_Binx,Sv_Csv,Sv_Info,Sv_Vtk,Sv_Pvtk;
   std::string CaseName,RunName,DirOut;
   std::string PartBeginDir;
   unsigned PartBegin,PartBeginFirst;
-  float FtPause;
   bool RhopOutModif;              ///<Indicates whether \ref RhopOutMin or RhopOutMax is changed.
   float RhopOutMin,RhopOutMax;    ///<Limits for \ref RhopOut density correction.
 
-  byte DomainMode; //0:No configured, 1:Particles, 2:Fixed
-  tdouble3 DomainParticlesMin,DomainParticlesMax;
-  tdouble3 DomainParticlesPrcMin,DomainParticlesPrcMax;
-  tdouble3 DomainFixedMin,DomainFixedMax;
+  float FtPause;
 
+  byte DomainMode; //0:Without configuration, 1:Particles, 2:Fixed
+  tfloat3 DomainParticlesMin,DomainParticlesMax;
+  tfloat3 DomainParticlesPrcMin,DomainParticlesPrcMax;
+  tfloat3 DomainFixedMin,DomainFixedMax;
 
+  std::string PtxasFile;          ///<File with ptxas information.
 
   JCfgRun();
   void Reset();

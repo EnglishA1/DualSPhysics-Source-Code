@@ -20,6 +20,37 @@
 #ifndef _JRadixSort_
 #define _JRadixSort_
 
+//NO_COMENTARIO
+//#############################################################################
+//# ES:
+//# Cambios:
+//# =========
+//# - Implementacion de RadixSort con OpenMP. (29-08-2012)
+//# - Nuevas implementaciones de SortData() para otros tipos. (01-10-2012)
+//# - Nueva implementacion de SortData() para double. (25-11-2013)
+//# - Nueva implementacion de SortData() para tdouble3. (02-12-2013)
+//# - Las directivas pragma omp se metieron dentro de bloques #ifdef para 
+//#   evitar problemas cuando se usa OpenMP y _WITHOMP no esta definida. (26-12-2013)
+//# - Se corrigio error cuando no se indicaba el numero de hilos correcto. Ahora
+//#   se indica si se quiere usoar OMP o una version secuencial. (30-12-2013)
+//# - Nuevo metodo MakeIndex(). (30-12-2013)
+//# - Remplaza unsigned long long por ullong. (01-10-2015)
+//# - Limpieza de codigo usado para debug. (30-01-2016)
+//# - EN:
+//# Changes:
+//# =========
+//# - Implementation of Radix Sort with OpenMP. (29-08-2012)
+//# - New implementations of SortData() for other types. (01-10-2012)
+//# - New implementation of SortData() for double. (25-11-2013)
+//# - New implementation of SortData() for tdouble3. (02-12-2013)
+//# - The pragma omp directives #ifdef are moved within the blocks
+//#   to avoid problems with the use of OpenMP and _WITHOMP if they are undefined. (26-12-2013)
+//# - Corrected error when the correct number of threads is not indicated. Now
+//#   indicates whether you want to use OMP or a sequential version. (30-12-2013)
+//# - New method MakeIndex(). (30-12-2013)
+//# - Replace unsigned long long by ullong. (01-10-2015)
+//# - Cleaning code used to debug. (30-01-2016)
+//#############################################################################
 
 #include "JObject.h"
 #include "TypesDef.h"

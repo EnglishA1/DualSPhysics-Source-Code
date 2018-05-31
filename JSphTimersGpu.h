@@ -1,18 +1,19 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file JSphTimersGpu.h \brief Measures time intervals during GPU execution.
@@ -20,7 +21,7 @@
 #ifndef _JSphTimersGpu_
 #define _JSphTimersGpu_
 
-#ifdef DISABLE_TIMERS
+#ifdef _CODE_FAST
   #define TmgStart(x,y) ;
   #define TmgStop(x,y) ;
 #else
@@ -30,33 +31,34 @@
 
 #include "JTimerCuda.h"
 
-/// Structure with information of the timer and time value in CPU.
+/// Structure with information of the timer and time value in GPU.
 typedef struct{
   JTimerCuda timer;
   bool active;
   double time;
 }StSphTimerGpu; 
 
-typedef enum{
-   TMG_Init=0
-  ,TMG_NlLimits=1
-  ,TMG_NlPreSort=2
-  ,TMG_NlRadixSort=3
-  ,TMG_NlCellBegin=4
-  ,TMG_NlSortData=5
-  ,TMG_NlOutCheck=6
-  ,TMG_CfPreForces=7
-  ,TMG_CfForces=8
-  ,TMG_SuShifting=9
-  ,TMG_SuComputeStep=10
-  ,TMG_SuFloating=11
-  ,TMG_SuMotion=12
-  ,TMG_SuPeriodic=13
-  ,TMG_SuResizeNp=14
-  ,TMG_SuDownData=15
-  ,TMG_SuSavePart=16
-}CsTypeTimerGPU;
-#define TMG_COUNT 17
+  typedef enum{
+     TMG_Init=0
+    ,TMG_NlLimits=1
+    ,TMG_NlPreSort=2
+    ,TMG_NlRadixSort=3
+    ,TMG_NlSortData=4
+    ,TMG_NlCellBegin=5
+    ,TMG_NlOutCheck=6
+    ,TMG_NlPeriCheck=7
+    ,TMG_NlPeriPrepare=8
+    ,TMG_CfPreForces=9
+    ,TMG_CfForces=10
+    ,TMG_CfShepard=11
+    ,TMG_CfPeriForces=12
+    ,TMG_SuComputeStep=13
+    ,TMG_SuFloating=14
+    ,TMG_SuMotion=15
+    ,TMG_SuDownData=16
+    ,TMG_SuSavePart=17
+  }CsTypeTimerGPU;
+  #define TMG_COUNT 18
 
 typedef StSphTimerGpu TimersGpu[TMG_COUNT];
 
@@ -65,34 +67,34 @@ typedef StSphTimerGpu TimersGpu[TMG_COUNT];
 //==============================================================================
 inline const char* TmgGetName(CsTypeTimerGPU ct){
   switch(ct){
-    case TMG_Init:              return("VA-Init");
-    case TMG_NlLimits:          return("NL-Limits");
-    case TMG_NlPreSort:         return("NL-PreSort");
-    case TMG_NlRadixSort:       return("NL-RadixSort");
-    case TMG_NlCellBegin:       return("NL-CellBegin");
-    case TMG_NlSortData:        return("NL-SortData");
-    case TMG_NlOutCheck:        return("NL-OutCheck");
-    case TMG_CfPreForces:       return("CF-PreForces");
-    case TMG_CfForces:          return("CF-Forces");
-    case TMG_SuShifting:        return("SU-Shifting");
-    case TMG_SuComputeStep:     return("SU-ComputeStep");
-    case TMG_SuFloating:        return("SU-Floating");
-    case TMG_SuMotion:          return("SU-Motion");
-    case TMG_SuPeriodic:        return("SU-Periodic");
-    case TMG_SuResizeNp:        return("SU-ResizeNp");
-    case TMG_SuDownData:        return("SU-DownData");
-    case TMG_SuSavePart:        return("SU-SavePart");
+    case TMG_Init:                  return("VA-Init");
+    case TMG_NlLimits:              return("NL-Limits");
+    case TMG_NlPreSort:             return("NL-PreSort");
+    case TMG_NlRadixSort:           return("NL-RadixSort");
+    case TMG_NlSortData:            return("NL-SortData");
+    case TMG_NlCellBegin:           return("NL-CellBegin");
+    case TMG_NlOutCheck:            return("NL-OutCheck");
+    case TMG_NlPeriCheck:           return("NL-PeriCheck");
+    case TMG_NlPeriPrepare:         return("NL-PeriPrepare");
+    case TMG_CfPreForces:           return("CF-PreForces");
+    case TMG_CfForces:              return("CF-Forces");
+    case TMG_CfShepard:             return("CF-Shepard");
+    case TMG_CfPeriForces:          return("CF-PeriForces");
+    case TMG_SuComputeStep:         return("SU-ComputeStep");
+    case TMG_SuFloating:            return("SU-Floating");
+    case TMG_SuMotion:              return("SU-Motion");
+    case TMG_SuDownData:            return("SU-DownData");
+    case TMG_SuSavePart:            return("SU-SavePart");
   }
   return("???");
 }
-
 //==============================================================================
 /// Returns the number of timers.
 //==============================================================================
 inline unsigned TmgGetCount(){ return(TMG_COUNT); }
 
 //==============================================================================
-/// Creates timers to measure time intervals.
+/// Creates the timers used to measure times.
 //==============================================================================
 inline void TmgCreation(TimersGpu vtimer,bool active){
   for(unsigned c=0;c<TMG_COUNT;c++){
@@ -125,14 +127,7 @@ inline void _TmgStop(TimersGpu vtimer,CsTypeTimerGPU ct){
 }
 
 //==============================================================================
-/// Initialises the time accumulated by all timers.
-//==============================================================================
-inline void TmgResetValues(TimersGpu vtimer){
-  for(unsigned ct=0;ct<TMG_COUNT;ct++)if(vtimer[ct].active)vtimer[ct].time=0; 
-}  
-
-//==============================================================================
-/// Increases the time accumulated manually.
+/// Increases the accumulated time manually. 
 //==============================================================================
 inline void TmgIncreaseValue(TimersGpu vtimer,CsTypeTimerGPU ct,double value){ if(vtimer[ct].active)vtimer[ct].time+=value; }  
 

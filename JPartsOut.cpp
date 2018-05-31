@@ -19,7 +19,6 @@
 
 #include "JPartsOut.h"
 #include "Functions.h"
-#include <algorithm>
 
 using namespace std;
 
@@ -91,7 +90,7 @@ llong JPartsOut::GetAllocMemory()const{
 //==============================================================================
 /// Resizes arrays for particles.
 //==============================================================================
-void JPartsOut::AddParticles(unsigned np,const unsigned* idp,const tdouble3* pos,const tfloat3* vel,const float* rhop,unsigned outrhop,unsigned outmove){
+void JPartsOut::AddParticles(unsigned np,const unsigned* idp,const tfloat3* pos,const tfloat3* vel,const float* rhop,unsigned outrhop,unsigned outmove){
   if(Count+np>Size)AllocMemory(Count+np+SizeIni,false);
   memcpy(Idp+Count,idp,sizeof(unsigned)*np);
   memcpy(Pos+Count,pos,sizeof(tdouble3)*np);

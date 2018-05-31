@@ -1,24 +1,28 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file JCellDivGpu.h \brief Declares the class \ref JCellDivGpu.
 
 #ifndef _JCellDivGpu_
 #define _JCellDivGpu_
+
+
+#pragma warning(disable : 4996) //Cancels sprintf() deprecated.
 
 #include "Types.h"
 #include "JObjectGpu.h"
@@ -30,128 +34,135 @@
 #include <iostream>
 #include <fstream>
 
+//#define DG_JCellDivGpu //-In JCellDivGpu checks that the result of PreSort is valid.
+
 //##############################################################################
 //# JCellDivGpu
 //##############################################################################
-/// \brief Defines the class responsible of generating the Neighbour List in GPU.
+/// \brief Defines the class responsible of computing the Neighbour List in GPU.
 
 class JCellDivGpu : protected JObjectGpu
 {
 protected:
-  const bool Stable;
-  const bool Floating;
-  const byte PeriActive;
-  const TpCellOrder CellOrder;
-  const TpCellMode CellMode;    ///< Modo de division en celdas. Division mode in cells.
-  const unsigned Hdiv;          ///< Valor por el que se divide a DosH. Value with ehich to divide 2h.
-  const float Scell,OvScell;
-  const tdouble3 Map_PosMin,Map_PosMax,Map_PosDif;
-  const tuint3 Map_Cells;
-  const unsigned CaseNbound,CaseNfixed,CaseNpb;
-  JLog2 *Log;
-  std::string DirOut;
+  const bool Stable;         ///<Ensures the same results when repeated the same simulation.
+  JLog2 *Log;                ///<Declares an object of the class \ref JLog2.
+  std::string DirOut;        ///<Name of the output directory.
+  bool RhopOut;              ///<Indicates whether the density correction RhopOut is activated or not.
+  float RhopOutMin;          ///<Minimum value for the density correction RhopOut.
+  float RhopOutMax;          ///<Minimum value for the density correction RhopOut.
 
-  bool AllocFullNct;    ///< Reserva memoria para el numero maximo de celdas del dominio (DomCells). Allocates memory for the maximum number of cells in the doamin (DomCells).
-  float OverMemoryNp;   ///< Porcentaje que se añade a la reserva de memoria de Np. (def=0). Percentage to be added to the allocated memory for Np (def=0).
-  word OverMemoryCells; ///< Numero celdas que se incrementa en cada dimension reservar memoria. (def=0). Number of cells that increase the allocated memoery in each dimension.
+  //-Constant values during simulation.
+  TpCellMode CellMode;       ///<Modes of cells division.
+  unsigned Hdiv;             ///<Value to divide 2h.
+  float Scell;               ///<Size of the cells.
+  float OvScell;             ///<Value of 1/ref\ Scell.
+  tuint3 MapCells;           ///<Maximum number of cells in each direction (X,Y,Z).
 
-  //-Vars del dominio definido.
-  //-Variables to define the domain.
-  unsigned DomCellCode;  ///< Clave para la codificacion de la celda de posicion. Key for the codification of the cell position.
-  tuint3 DomCelIni,DomCelFin;
-  tdouble3 DomPosMin,DomPosMax;
-  tuint3 DomCells;
+  //-Variables with allocated memory as a function of particles in GPU.
+  unsigned SizeNp;           ///<Size of \ref CellPart and \ref SortPart.
+  unsigned *CellPart;        ///<Cell of each particle [Np].
+  unsigned *SortPart;        ///<Array to reorder particles. 
+  unsigned SizeAuxMem;       ///<Size of \ref AuxMem.
+  float *AuxMem;             ///<Auxiliar array used for "reduction" task. 
 
-  //-Memoria reservada en funcion de particulas en GPU.
-  //-Variables with allocated memory as a function of the number of particles in GPU
-  unsigned SizeNp;
-  unsigned *CellPart;
-  unsigned *SortPart;
-  unsigned SizeAuxMem;
-  float *AuxMem;
+  //-Variables with allocated memory as a function of cells in GPU.
+  unsigned SizeNct;          ///<Size of \ref BeginEndCell.
+  int2 *BeginEndCell;        ///<Position of the first and last particle of each cell. [BoundOk(nct),BoundIgnore(1),Fluid(nct),BoundOut(1),FluidOut(1),Displaced(1)]
 
-  //-Memoria reservada en funcion de celdas en GPU.
-  //-Variables with allocated memory as a function of the number of cells in GPU 
-  unsigned SizeNct;
-  int2 *BeginEndCell;  ///< Contiene el principio y final de cada celda. Contains the first and final particle of each cell.
-  // BeginEndCell=[BoundOk(nct),BoundIgnore(1),Fluid(nct),BoundOut(1),FluidOut(1),BoundOutIgnore(1),FluidOutIgnore(1)]
+  long long MemAllocGpuNp;  ///<Amount of allocated memory in GPU for particles.
+  long long MemAllocGpuNct; ///<Amount of allocated memory in GPU for cells.
 
-  ullong MemAllocGpuNp;  ///< Mermoria reservada en Gpu para particulas. Allocated GPU memory for particles.
-  ullong MemAllocGpuNct; ///< Mermoria reservada en Gpu para celdas. Allocated GPU memory for cells.
+  unsigned Ndiv;             ///<Number of times that \ref Divide was applied.            
+  unsigned NdivFull;         ///<Number of times that \ref Divide was appiled to all particles.
+  unsigned Nptot;            ///<Number of particles (including excluded) at that step. 
+  unsigned Np;               ///<Number of particles at that step. 
+  unsigned Npb;              ///<Number of particles of the boundary block.
+  unsigned NpbOut;           ///<Number of particles of the boundary block that were excluded.
+  unsigned NpfOut;           ///<Number of fluid particles that were excluded.
+  unsigned NpfOutRhop;       ///<Number of fluid particles that were excluded due to its value of density out of the desirable limits.
+  unsigned NpfOutMove;       ///<Number of fluid particles that were excluded since the particle moves faster than the allowed vecocity.
+  unsigned NpbIgnore;        ///<Number of boundary particles that are not going to interact with fluid particles.
 
-  unsigned Ndiv,NdivFull;
-
-  //-Numero de particulas por tipo al iniciar el divide.
-  //-Particle number by type at the beginning of the division
-  unsigned Npb1;
-  unsigned Npf1;
-  unsigned Npb2;
-  unsigned Npf2;
-
-  unsigned Nptot;  ///< Numero total de particulas incluidas las que se excluyeron al terminar el divide. Number of particles including those excluded at the end of the division
-  unsigned NpbOut,NpfOut,NpbOutIgnore,NpfOutIgnore;
+  tuint3 CellDomainMin;      ///<First cell to be considered for particle interactions at that step.
+  tuint3 CellDomainMax;      ///<Last cell to be considered for particle interactions at that step.
+  unsigned Ncx;              ///<Number of cells in X direction at that step with particle interactions.
+  unsigned Ncy;              ///<Number of cells in Y direction at that step with particle interactions.
+  unsigned Ncz;              ///<Number of cells in Z direction at that step with particle interactions.
+  unsigned Nsheet;           ///<Number of cells in X direction * Y direction at that ste with particle interactionsp.
+  unsigned Nct;              ///<Number of total cells at that step with particle interactions.
+  unsigned Nctt;             ///<\ref Nct + special cells, Nctt=SizeBeginCell()-1
+  unsigned BoxIgnore;        ///<Index of \ref BeginCell with the first cell with ignored boundary particles. 
+  unsigned BoxFluid;         ///<Index of \ref BeginCell with the first fluid particles. 
+  unsigned BoxBoundOut;      ///<Index of \ref BeginCell with the excluded boundary particle.
+  unsigned BoxFluidOut;      ///<Index of \ref BeginCell with the excluded fluid particle.
   
-  unsigned NpFinal,NpbFinal;
-  unsigned NpfOutRhop,NpfOutMove,NpbIgnore;
+  bool BoundLimitOk;         ///<Indicates that limits of boundaries are already computed in \ref BoundLimitCellMin and \ref BoundLimitCellMax.
+  tuint3 BoundLimitCellMin;  ///<Cell with the boundary with the minimum positions (X,Y,Z).
+  tuint3 BoundLimitCellMax;  ///<Cell with the boundary with the maximum positions (X,Y,Z).
 
-  tuint3 CellDomainMin,CellDomainMax; ///< Limites del dominio en celdas dentro de DomCells. Domain limits in cells within DomCells.
-  unsigned Ncx,Ncy,Ncz,Nsheet,Nct;
-  ullong Nctt; ///< Numero total de celdas incluyendo las especiales Nctt=SizeBeginEndCell(). Number of cells including the special Nctt=SizeBeginEndCell() 
-  unsigned BoxIgnore,BoxFluid,BoxBoundOut,BoxFluidOut,BoxBoundOutIgnore,BoxFluidOutIgnore;
+  bool BoundDivideOk;        ///<Indicates that limits of boundaries were already computed in \ref BoundDivideCellMin and \ref BoundDivideCellMax.
+  tuint3 BoundDivideCellMin; ///<Value of \ref CellDomainMin when \ref Divide was applied to boundary particles.
+  tuint3 BoundDivideCellMax; ///<Value of \ref CellDomainMax when \ref Divide was applied to boundary particles.
 
-  bool BoundLimitOk;  ///< Indica que los limites del contorno ya estan calculados en BoundLimitCellMin y BoundLimitCellMax. Indicates boundary limits are already computed in BoundLimitCellMin and BoundLimitCellMax
-  tuint3 BoundLimitCellMin,BoundLimitCellMax;
-
-  bool BoundDivideOk;   ///< Indica que los limites del contorno utilizados en el divide previo fueron BoundDivideCellMin y BoundDivideCellMax. Indicates the boundary limits used in the previous division were computed in BoundDivideCellMin y BoundDivideCellMax
-  tuint3 BoundDivideCellMin,BoundDivideCellMax;
-
-  bool DivideFull;  ///< Indica que el divide se aplico a fluido y contorno (no solo al fluido). Indicates that the division applies to fluid and boundary (not only fluid)
+  bool DivideFull;           ///<Indicates of \ref Divide was applied to all particles and not only fluid particles.
 
   void Reset();
+  
+  //-Manages the dynamic memory allocation.
+  void FreeBasicMemoryNct();
+  void FreeBasicMemoryAll();
+  void AllocBasicMemoryNp(unsigned np);
+  bool CheckMemoryNp(bool returnerror);
+  void AllocBasicMemoryNct(unsigned nct);
+  bool CheckMemoryNct(bool returnerror);
 
-  //-Gestion de reserva dinamica de memoria.
-  //-Management of allocated dynamic memory.
-  void FreeMemoryNct();
-  void FreeMemoryAll();
-  void AllocMemoryNp(ullong np);
-  void AllocMemoryNct(ullong nct);
-  void CheckMemoryNp(unsigned npmin);
-  void CheckMemoryNct(unsigned nctmin);
+  unsigned SizeBeginEndCell(unsigned nct)const{ return((nct*2)+4); } //-[BoundOk(nct),BoundIgnore(1),Fluid(nct),BoundOut(1),FluidOut(1),Displaced(1)]
 
-  ullong SizeBeginEndCell(ullong nct)const{ return((nct*2)+5); } //-[BoundOk(nct),BoundIgnore(1),Fluid(nct),BoundOut(1),FluidOut(1),BoundOutIgnore(1),FluidOutIgnore(1)]
+  long long GetAllocMemoryCpu()const{ return(0); }
+  long long GetAllocMemoryGpuNp()const{ return(MemAllocGpuNp); };
+  long long GetAllocMemoryGpuNct()const{ return(MemAllocGpuNct); };
+  long long GetAllocMemoryGpu()const{ return(GetAllocMemoryGpuNp()+GetAllocMemoryGpuNct()); };
 
-  ullong GetAllocMemoryCpu()const{ return(0); }
-  ullong GetAllocMemoryGpuNp()const{ return(MemAllocGpuNp); };
-  ullong GetAllocMemoryGpuNct()const{ return(MemAllocGpuNct); };
-  ullong GetAllocMemoryGpu()const{ return(GetAllocMemoryGpuNp()+GetAllocMemoryGpuNct()); };
+  void ConfigInitCellMode(TpCellMode cellmode,float dosh,unsigned np,unsigned npb,bool rhopout,float rhopmin,float rhopmax);
 
-  void VisuBoundaryOut(unsigned p,unsigned id,tdouble3 pos,word check)const;
-  void CalcCellDomainBound(unsigned n,unsigned pini,unsigned n2,unsigned pini2,const unsigned* dcellg,const word* codeg,tuint3 &cellmin,tuint3 &cellmax);
-  void CalcCellDomainFluid(unsigned n,unsigned pini,unsigned n2,unsigned pini2,const unsigned* dcellg,const word* codeg,tuint3 &cellmin,tuint3 &cellmax);
+  void VisuBoundaryOut(unsigned p,unsigned id,tfloat3 pos,word code)const;
+  tuint3 GetMapCell(const tfloat3 &pos)const;
+  void CalcCellDomainBound(unsigned n,unsigned pini,const float3* posg,word* codeg,tuint3 &cellmin,tuint3 &cellmax);
+  void CalcCellDomainFluid(unsigned n,unsigned pini,const float3* posg,const float* rhopg,word* codeg,tuint3 &cellmin,tuint3 &cellmax);
 
   void CellBeginEnd(unsigned cell,unsigned ndata,unsigned* data)const;
   int2 CellBeginEnd(unsigned cell)const;
   unsigned CellSize(unsigned cell)const{ int2 v=CellBeginEnd(cell); return(unsigned(v.y-v.x)); }
 
 public:
-  JCellDivGpu(bool stable,bool floating,byte periactive,TpCellOrder cellorder,TpCellMode cellmode,float scell,tdouble3 mapposmin,tdouble3 mapposmax,tuint3 mapcells,unsigned casenbound,unsigned casenfixed,unsigned casenpb,JLog2 *log,std::string dirout,bool allocfullnct=true,float overmemorynp=CELLDIV_OVERMEMORYNP,word overmemorycells=CELLDIV_OVERMEMORYCELLS);
+  const byte PeriActive;     ///<Activate the use of periodic boundary conditions.
+  const TpCellOrder Order;   ///<Direction (X,Y,Z) used to order particles. 
+  const unsigned CaseNbound; ///<Number of boundary particles.
+  const unsigned CaseNfixed; ///<Number of fixed boundary particles. 
+  const unsigned CaseNpb;    ///<Number of particles of the boundary block
+  const tfloat3 MapPosMin;   ///<Minimum limits of the map for the case.
+  const tfloat3 MapPosMax;   ///<Maximum limits of the map for the case.
+  const tfloat3 MapPosDif;   ///<\ref MapPosMax - \ref MapPosMin.
+  const float Dosh;          ///<2*h (being h the smoothing length).
+  const bool Floating;       ///<Indicates if there are floating bodies.
+  const bool LaminarSPS;     ///<Indicates if Laminar + SPS viscosity treatment is being used.
+
+  JCellDivGpu(bool stable,JLog2 *log,std::string dirout,byte periactive,bool laminarsps,const tfloat3 &mapposmin,const tfloat3 &mapposmax,float dosh,unsigned casenbound,unsigned casenfixed,unsigned casenpb,TpCellOrder order);
   ~JCellDivGpu();
-  void FreeMemoryGpu(){ FreeMemoryAll(); }
 
-  void DefineDomain(unsigned cellcode,tuint3 domcelini,tuint3 domcelfin,tdouble3 domposmin,tdouble3 domposmax);
+  void SortBasicArrays(const unsigned *idp,const float3 *pos,const float3 *vel,const float *rhop,const word *code,const float *press,const float *viscop,const unsigned *idpm, unsigned *idp2,float3 *pos2,float3 *vel2,float *rhop2,word *code2,float *press2,float *viscop2,unsigned *idpm2);
 
-  void SortBasicArrays(const unsigned *idp,const word *code,const unsigned *dcell,const double2 *posxy,const double *posz,const float4 *velrhop,unsigned *idp2,word *code2,unsigned *dcell2,double2 *posxy2,double *posz2,float4 *velrhop2);
-  void SortDataArrays(const float4 *a,float4 *a2);
-  void SortDataArrays(const float *a,const float *b,float *a2,float *b2);
-  void SortDataArrays(const double2 *a,const double *b,const float4 *c,double2 *a2,double *b2,float4 *c2);
+  void SortDataArrays(const float *a,const float3 *b,float *a2,float3 *b2);
+  void SortDataArrays(const float *a,const float3 *b,const float3 *c,float *a2,float3 *b2,float3 *c2);
   void SortDataArrays(const tsymatrix3f *a,tsymatrix3f *a2);
 
-  void CheckParticlesOut(unsigned npfout,const unsigned *idp,const tdouble3 *pos,const float *rhop,const word *code);
+  void CheckParticlesOut(unsigned npfout,const unsigned *idp,const tfloat3 *pos,const float *rhop,const word *code);
   float* GetAuxMem(unsigned size);
 
   TpCellMode GetCellMode()const{ return(CellMode); }
   unsigned GetHdiv()const{ return(Hdiv); }
   float GetScell()const{ return(Scell); }
+  tuint3 GetMapCells()const{ return(MapCells); };
 
   unsigned GetNct()const{ return(Nct); }
   unsigned GetNcx()const{ return(Ncx); }
@@ -162,20 +173,22 @@ public:
 
   tuint3 GetCellDomainMin()const{ return(CellDomainMin); }
   tuint3 GetCellDomainMax()const{ return(CellDomainMax); }
-  tdouble3 GetDomainLimits(bool limitmin,unsigned slicecellmin=0)const;
+  tfloat3 GetDomainLimits(bool limitmin,unsigned slicecellmin=0)const;
 
-  unsigned GetNpFinal()const{ return(NpFinal); }
-  unsigned GetNpbFinal()const{ return(NpbFinal); }
+  unsigned GetNp()const{ return(Np); }
+  unsigned GetNpb()const{ return(Npb); }
   unsigned GetNpbIgnore()const{ return(NpbIgnore); }
   unsigned GetNpOut()const{ return(NpbOut+NpfOut); }
-  unsigned GetNpbOutIgnore()const{ return(NpbOutIgnore); }
-  unsigned GetNpfOutIgnore()const{ return(NpfOutIgnore); }
 
   unsigned GetNpfOutPos()const{ return(NpfOut-(NpfOutMove+NpfOutRhop)); }
   unsigned GetNpfOutMove()const{ return(NpfOutMove); }
   unsigned GetNpfOutRhop()const{ return(NpfOutRhop); }
 
+  const unsigned* GetCellPart()const{ return(CellPart); }
   const int2* GetBeginCell(){ return(BeginEndCell); }
+
+  uint2 GetRangeParticlesCells(bool fluid,unsigned celini,unsigned celfin)const;
+  unsigned GetParticlesCells(unsigned celini,unsigned celfin);
 };
 
 #endif

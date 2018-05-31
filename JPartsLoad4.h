@@ -20,6 +20,21 @@
 #ifndef _JPartsLoad4_
 #define _JPartsLoad4_
 
+//NO_COMENTARIO
+//#############################################################################
+//# Descripcion:
+//# =============
+//# Clase para cargar ficheros en formato BI4.
+//#
+//# Cambios:
+//# =========
+//# - Carga datos iniciales de particulas. (27/07/2012)
+//# - Carga datos iniciales de particulas. (27/07/2012)
+//# - Carga particulas excluidas de BI2 y BI3. (05/03/2013)
+//# - Arranque de simulaciones iniciadas a partir de BI2 y BI3. (05/03/2013)
+//# - Las funcion GetAllocMemory() devuelve long long. (05/04/2013)
+//# - Remplaza long long por llong. (01-10-2015)
+//#############################################################################
 
 #include "TypesDef.h"
 #include "JObject.h"
@@ -66,6 +81,9 @@ protected:
   tdouble3 *Pos;
   tfloat4 *VelRhop;
 
+  tfloat3 *Vel;
+  float *Rhop;
+
   void AllocMemory(unsigned count);
   template<typename T> T* SortParticles(const unsigned *vsort,unsigned count,T *v)const;
   void SortParticles();
@@ -76,8 +94,8 @@ public:
   ~JPartsLoad4();
   void Reset();
 
-  void LoadParticles(const std::string &casedir,const std::string &casename,unsigned partbegin,const std::string &casedirbegin);
-  void CheckConfig(ullong casenp,ullong casenfixed,ullong casenmoving,ullong casenfloat,ullong casenfluid,bool perix,bool periy,bool periz)const;
+  void LoadParticles4(const std::string &casedir,const std::string &casename,unsigned partbegin,const std::string &casedirbegin);
+  void CheckConfig4(ullong casenp,ullong casenfixed,ullong casenmoving,ullong casenfloat,ullong casenfluid,bool perix,bool periy,bool periz)const;
   void RemoveBoundary();
 
   unsigned GetCount()const{ return(Count); }
@@ -93,6 +111,10 @@ public:
   const unsigned* GetIdp(){ return(Idp); }
   const tdouble3* GetPos(){ return(Pos); }
   const tfloat4* GetVelRhop(){ return(VelRhop); }
+
+  //new
+  const tfloat3* GetVel(){ return(Vel); }
+  const float* GetRhop(){ return(Rhop); }
 
   tdouble3 GetCasePosMin()const{ return(CasePosMin); }
   tdouble3 GetCasePosMax()const{ return(CasePosMax); }

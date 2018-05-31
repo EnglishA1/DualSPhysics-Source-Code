@@ -1,24 +1,27 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file JXml.h \brief Declares the class \ref JXml.
 
 #ifndef _JXml_
 #define _JXml_
+
+#pragma warning(disable : 4996) //Cancels sprintf() deprecated.
 
 #include "TypesDef.h"
 #include "JObject.h"
@@ -63,7 +66,7 @@ public:
   /// returns \a NULL instead of throwing an exception.
   /// \throw JException The requested element does not exist...
   //==============================================================================
-  TiXmlElement* GetFirstElement(const TiXmlNode* node,const std::string &name,bool optional=false)const;
+  TiXmlElement* GetFirstElement(TiXmlNode* node,const std::string &name,bool optional=false)const;
 
   //==============================================================================
   /// Returns the next requested element of a node TiXmlNode.
@@ -80,7 +83,7 @@ public:
   /// \param node Xml node where the reach is performed.
   /// \param name Name of filtered elements (no filter using "").
   //==============================================================================
-  unsigned CountElements(const TiXmlNode* node,const std::string &name)const;
+  unsigned CountElements(TiXmlNode* node,const std::string &name)const;
 
   //==============================================================================
   /// Removes the requested node.
@@ -91,7 +94,7 @@ public:
   //==============================================================================
   /// Returns the filename of the current xml with row of the requested node.
   //==============================================================================
-  std::string ErrGetFileRow(const TiXmlNode* node)const;
+  std::string ErrGetFileRow(TiXmlNode* node)const;
 
   //==============================================================================
   /// Throws an exception with the xml node and the name of the element.
@@ -100,7 +103,7 @@ public:
   /// \param missing Error because it does not exist.
   /// \throw JException Error in element...
   //==============================================================================
-  void ErrReadElement(const TiXmlNode* node,const std::string &element,bool missing)const;
+  void ErrReadElement(TiXmlNode* node,const std::string &element,bool missing)const;
 
   //==============================================================================
   /// Throws an exception with the xml element and the name of the attribute.
@@ -109,25 +112,7 @@ public:
   /// \param missing Error because it does not exist.
   /// \throw JException Error in element...
   //==============================================================================
-  void ErrReadAtrib(const TiXmlElement* ele,const std::string &atrib,bool missing)const;
-
-
-  //-Checking child element of the element.
-
-  //==============================================================================
-  /// Checks if the requested child element of an element already exists.
-  /// \param ele Xml element of the error.
-  /// \param name Name of the requested element.
-  //==============================================================================
-  bool ExistsElement(const TiXmlElement* ele,const std::string &name)const{ return(ele->FirstChildElement(name.c_str())!=NULL); }
-
-  //==============================================================================
-  /// Throws an exception if there are unknown or repeated elements.
-  /// \param lis Xml element to check.
-  /// \param names List of valid names (separated by spaces).
-  /// \param checkrepeated Checks if there are repeated elements.
-  //==============================================================================
-  void CheckElementNames(TiXmlElement* lis,bool checkrepeated,std::string names)const;
+  void ErrReadAtrib(TiXmlElement* ele,const std::string &atrib,bool missing)const;
 
 
   //-Checking attributes of the element.
@@ -137,7 +122,7 @@ public:
   /// \param ele Xml element of the error.
   /// \param name Name of the requested attribute.
   //==============================================================================
-  bool ExistsAttribute(const TiXmlElement* ele,const std::string &name)const;
+  bool ExistsAttribute(TiXmlElement* ele,const std::string &name)const;
 
 
   //-Reading attributes of the element.
@@ -151,18 +136,18 @@ public:
   /// \param valdef Value by default if it does not exist and \a optional was activated. 
   /// \throw JException The requested attribute does not exist...
   //==============================================================================
-  std::string GetAttributeStr(const TiXmlElement* ele,const std::string &name,bool optional=false,const std::string &valdef="")const;
+  std::string GetAttributeStr(TiXmlElement* ele,const std::string &name,bool optional=false,const std::string &valdef="")const;
 
   //==============================================================================
   /// Checks and returns a value of type bool of an xml element, 
-  /// valid values in xml text are: \a '0', \a '1', \a 'false' and \a 'true'.
+  /// valid values in xml text are: \a '0', \a '1', \a 'false' & \a 'true'.
   /// \param ele Xml element.
   /// \param optional If it does not exist,
   /// returns \a valdef instead of throwing an exception.
   /// \param valdef Value by default if it does not exist and \a optional was activated. 
   /// \throw JException The requested attribute does not exist...
   //==============================================================================
-  bool GetAttributeBool(const TiXmlElement* ele,const std::string &name,bool optional=false,bool valdef=false)const;
+  bool GetAttributeBool(TiXmlElement* ele,const std::string &name,bool optional=false,bool valdef=false)const;
 
   //==============================================================================
   /// Checks and returns a value of type byte of an xml element that must be (0-225).
@@ -173,16 +158,6 @@ public:
   /// \throw JException The requested attribute does not exist...
   //==============================================================================
   byte GetAttributeByte(TiXmlElement* ele,const std::string &name,bool optional=false,byte valdef=0)const;
-
-  //==============================================================================
-  /// Checks and returns a value of type word of an xml element that must be (0-65535).
-  /// \param ele Xml element.
-  /// \param optional If it does not exist,
-  /// returns \a valdef instead of throwing an exception.
-  /// \param valdef Value by default if it does not exist and \a optional was activated. 
-  /// \throw JException The requested attribute does not exist...
-  //==============================================================================
-  word GetAttributeWord(TiXmlElement* ele,const std::string &name,bool optional=false,word valdef=0)const;
 
   //==============================================================================
   /// Checks and returns a value of type unsigned of an xml element that must be positive.
@@ -253,19 +228,14 @@ public:
   /// \param name Name of the element to be reached.
   /// \param node Xml node where the element is reached.
   /// \param attrib Name of the requested attribute.
-  /// \param optional If it does not exist,
-  /// \param valdef Value by default if it does not exist and \a optional was activated. 
-  /// \throw JException The requested element or attribute does not exist...
+  /// \throw JException Element is not found...
   //==============================================================================
-  std::string ReadElementStr(TiXmlNode* node,const std::string &name,const std::string &attrib,bool optional=false,const std::string &valdef="")const{
-    TiXmlElement* ele=GetFirstElement(node,name,optional); 
-    return(ele? GetAttributeStr(ele,attrib,optional,valdef): valdef);
-  }
+  std::string ReadElementStr(TiXmlNode* node,const std::string &name,const std::string &attrib){ return(GetAttributeStr(GetFirstElement(node,name),attrib)); }
   
   //==============================================================================
   /// Calls \ref ReadElementDouble3() with the same parameters.
   //==============================================================================
-  tfloat3 ReadElementFloat3(TiXmlNode* node,const std::string &name)const{ return(ToTFloat3(ReadElementDouble3(node,name))); }
+  tfloat3 ReadElementFloat3(TiXmlNode* node,const std::string &name){ return(ToTFloat3(ReadElementDouble3(node,name))); }
   
   //==============================================================================
   /// Checks and returns value of type double3 of the first xml element 
@@ -275,7 +245,7 @@ public:
   /// \throw JException Element is not found...
   /// \throw JException Format not valid for the requested type...
   //==============================================================================
-  tdouble3 ReadElementDouble3(TiXmlNode* node,const std::string &name)const{ return(GetAttributeDouble3(GetFirstElement(node,name))); }
+  tdouble3 ReadElementDouble3(TiXmlNode* node,const std::string &name){ return(GetAttributeDouble3(GetFirstElement(node,name))); }
   
   //==============================================================================
   /// Checks and returns value of type int3 of the first xml element 
@@ -285,14 +255,12 @@ public:
   /// \throw JException Element is not found...
   /// \throw JException Format not valid for the requested type...
   //==============================================================================
-  tint3 ReadElementInt3(TiXmlNode* node,const std::string &name)const{ return(GetAttributeInt3(GetFirstElement(node,name))); }
+  tint3 ReadElementInt3(TiXmlNode* node,const std::string &name){ return(GetAttributeInt3(GetFirstElement(node,name))); }
   
   //==============================================================================
   /// Calls \ref ReadElementDouble() with the same parameters.
   //==============================================================================
-  float ReadElementFloat(TiXmlNode* node,const std::string &name,const std::string &attrib,bool optional=false,float valdef=0)const{ 
-    return(float(ReadElementDouble(node,name,attrib,optional,valdef)));
-  }
+  float ReadElementFloat(TiXmlNode* node,const std::string &name,const std::string &attrib){ return(float(ReadElementDouble(node,name,attrib))); }
   
   //==============================================================================
   /// Checks and returns value of type double of the first xml element 
@@ -300,61 +268,31 @@ public:
   /// \param name Name of the element to be reached.
   /// \param node Xml node where the element is reached.
   /// \param attrib Name of the requested attribute.
-  /// \param optional If it does not exist,
-  /// \param valdef Value by default if it does not exist and \a optional was activated. 
   /// \throw JException Element is not found...
   /// \throw JException Format not valid for the requested type...
   //==============================================================================
-  double ReadElementDouble(TiXmlNode* node,const std::string &name,const std::string &attrib,bool optional=false,double valdef=0)const{ 
-    TiXmlElement* ele=GetFirstElement(node,name,optional); 
-    return(ele? GetAttributeDouble(ele,attrib,optional,valdef): valdef);
-  }
-
+  double ReadElementDouble(TiXmlNode* node,const std::string &name,const std::string &attrib){ return(GetAttributeDouble(GetFirstElement(node,name),attrib.c_str())); }
+  
   //==============================================================================
   /// Checks and returns value of type unsigned of the first xml element 
   /// of a node with a given name.
   /// \param name Name of the element to be reached.
   /// \param node Xml node where the element is reached.
   /// \param attrib Name of the requested attribute.
-  /// \param optional If it does not exist,
-  /// \param valdef Value by default if it does not exist and \a optional was activated. 
   /// \throw JException Element is not found...
   /// \throw JException Format not valid for the requested type...
   //==============================================================================
-  unsigned ReadElementUnsigned(TiXmlNode* node,const std::string &name,const std::string &attrib,bool optional=false,unsigned valdef=0)const{ 
-    TiXmlElement* ele=GetFirstElement(node,name,optional); 
-    return(ele? GetAttributeUnsigned(ele,attrib,optional,valdef): valdef);
-  }
+  unsigned ReadElementUnsigned(TiXmlNode* node,const std::string &name,const std::string &attrib){ return(GetAttributeUnsigned(GetFirstElement(node,name),attrib.c_str())); }
   
   //==============================================================================
   /// Checks and returns value of type int of the first xml element 
   /// of a node with a given name.
   /// \param name Name of the element to be reached.
   /// \param node Xml node where the element is reached.
-  /// \param optional If it does not exist,
-  /// \param valdef Value by default if it does not exist and \a optional was activated. 
   /// \throw JException Element is not found...
   /// \throw JException Format not valid for the requested type...
   //==============================================================================
-  int ReadElementInt(TiXmlNode* node,const std::string &name,const std::string &attrib,bool optional=false,int valdef=0)const{ 
-    TiXmlElement* ele=GetFirstElement(node,name,optional); 
-    return(ele? GetAttributeInt(ele,attrib,optional,valdef): valdef);
-  }
-  
-  //==============================================================================
-  /// Checks and returns value of type bool of the first xml element 
-  /// of a node with a given name.
-  /// \param name Name of the element to be reached.
-  /// \param node Xml node where the element is reached.
-  /// \param optional If it does not exist,
-  /// \param valdef Value by default if it does not exist and \a optional was activated. 
-  /// \throw JException Element is not found...
-  /// \throw JException Format not valid for the requested type...
-  //==============================================================================
-  bool ReadElementBool(TiXmlNode* node,const std::string &name,const std::string &attrib,bool optional=false,bool valdef=0)const{ 
-    TiXmlElement* ele=GetFirstElement(node,name,optional); 
-    return(ele? GetAttributeBool(ele,attrib,optional,valdef): valdef);
-  }
+  int ReadElementInt(TiXmlNode* node,const std::string &name,const std::string &attrib){ return(GetAttributeInt(GetFirstElement(node,name),attrib.c_str())); }
 
   //- Reading arrays of complete nodes.
 
@@ -422,14 +360,6 @@ public:
   /// \param v Value of the attribute.
   //==============================================================================
   static void AddAttribute(TiXmlElement* ele,const std::string &attrib,const std::string &v);
-
-  //==============================================================================
-  /// Adds attribute of type char[] to an xml element.
-  /// \param ele Xml element.
-  /// \param attrib Name of the attribute.
-  /// \param v Value of the attribute.
-  //==============================================================================
-  static void AddAttribute(TiXmlElement* ele,const char *attrib,const char *v){ AddAttribute(ele,std::string(attrib),std::string(v)); }
 
   //==============================================================================
   /// Adds attribute of type bool to an xml element.
@@ -618,13 +548,6 @@ public:
   /// \param v Value of the element..
   //==============================================================================
   static TiXmlElement* AddElementAttrib(TiXmlNode* node,const std::string &name,const std::string &attrib,const std::string &v){ return(node->InsertEndChild(MakeElementAttrib(name,attrib,v))->ToElement()); }
-  
-  //==============================================================================
-  /// Adds a new element to the node and returns the element.
-  /// \param node Xml node to which the element node is created.
-  /// \param name Name of the element.
-  //==============================================================================
-  static TiXmlElement* AddElement(TiXmlNode* node,const std::string &name){ TiXmlElement item(name.c_str()); return(node->InsertEndChild(item)->ToElement()); }
 
 public:
   //==============================================================================
@@ -658,14 +581,6 @@ public:
   /// \throw JException Problems with file access...
   //==============================================================================
   void LoadFile(const std::string &fname);
-
-  //==============================================================================
-  /// Correct symbols in file.
-  /// \param fname Filename.
-  /// \throw JException Problems with file access...
-  //==============================================================================
-  void CorrectFile(const std::string &fname);
-
 };
 
 #endif

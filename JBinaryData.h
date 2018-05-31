@@ -15,6 +15,61 @@
  You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
+//NO_COMENTARIO
+//#############################################################################
+//# ES:
+//# Descripcion:
+//# =============
+//# Clase base para la definicion de cualquier formato binario de fichero.
+//# Algunas de sus funcionalidades son:
+//# - Permite guardar datos de todo tipo en formato binario.
+//# - Todos los datos contienen nombre y tipo para permitir su exploracion sin
+//#   sin conocer su estructura.
+//# - Los datos se pueden organizar en distintos niveles con forma de arbol.
+//# - Permite guardar datos basicos y arrays de tipos basicos y strings.
+//# - La lectura del contenido de arrays desde fichero puede ser de forma 
+//#   selectiva, sólo los que se necesiten.
+//# - Los arrays se pueden redimensionar de forma automatica segun se vayan
+//#   introduciendo mas datos. 
+//# - Permite uso de punteros externos para reducir el consumo de memoria. 
+//# - Implementacion de constructor de copia y sobrecarga de asigancion. 
+//# - Permite la grabacion y lectuara de varios items consecutivos en un fichero. 
+//#   Esto permite la ampliacion de ficheros sin reescribir todo el contenido.
+//#
+//# Cambios:
+//# =========
+//# - Implementacion. (25-08-2013 <-> 23-11-2013)
+//# - Ahora el metodo SaveFileListApp() graba los datos del Parent al principio
+//#   del fichero. (12-01-2014)
+//# - Opcion en SaveFileXml() para grabar datos de arrays. (04-12-2014)
+//#
+//# EN:
+//# Description:
+//# =============
+//# Class base for the definition of any binary file format.
+//# Some of its features are:
+//# - Save all data in binary format.
+//# - All data contains name and type to allow use without knowing 
+//#   its structure.
+//# - The data can be organized into different tree-shaped levels.
+//# - Saves basic data and arrays of basic types and strings.
+//# - Reading arrays from file content can be done selectively, 
+//#   only when needed.
+//# - The arrays resize automatically as more data 
+//#   are introduced.
+//# - It allows use of external pointers to reduce the memory consumption.
+//# - Implementation of constructor copy and overloaded assignment.
+//# - It allows recording and reading several consecutive items in a file,
+//#   this allows the extension of files without rewrite the entire content.
+//#
+//# Changes:
+//# =========
+//# - Implementation. (25-08-2013 <-> 23-11-2013)
+//# - Now the SaveFileListApp() method writes data from the Parent at 
+//#   the beginning of the file. (12-01-2014)
+//# - Option in SaveFileXml() to record data in arrays. (04-12-2014)
+//#
+//#############################################################################
 
 /// \file JBinaryData.h \brief Declares the class \ref JBinaryData.
 
@@ -33,7 +88,7 @@ class JBinaryData;
 //# JBinaryDataDef
 //##############################################################################
 /// \brief Defines types to be used in \ref JBinaryData and \ref JBinaryDataArray
-// Define tipos usados en \ref JBinaryData y \ref JBinaryDataArray
+/// Define tipos usados en \ref JBinaryData y \ref JBinaryDataArray
 
 class JBinaryDataDef
 {
@@ -46,7 +101,6 @@ class JBinaryDataDef
 
   static std::string TypeToStr(TpData type);
   static size_t SizeOfType(TpData type);
-  static bool TypeIsTriple(TpData type);
 };
 
 
@@ -54,7 +108,7 @@ class JBinaryDataDef
 //# JBinaryDataArray
 //##############################################################################
 /// \brief Defines data arrays included in binary files.
-// Define arrays de datos incluidos en ficheros binarios.
+/// Define arrays de datos incluidos en ficheros binarios.
 
 class JBinaryDataArray : protected JObject
 {
@@ -125,7 +179,7 @@ class JBinaryDataArray : protected JObject
 //# JBinaryData
 //##############################################################################
 /// \brief Defines any binary format of a file.
-// Clase base para la definicion de cualquier formato binario de fichero.
+/// Clase base para la definicion de cualquier formato binario de fichero.
 
 class JBinaryData : protected JObject
 {

@@ -15,7 +15,7 @@
  You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
-/// \file JBinaryData.cpp \brief Implements the class \ref JBinaryData.
+/// \file JBinaryData.cpp \brief Implements the class \ref JBinaryData
 
 #include "JBinaryData.h"
 #include "Functions.h"
@@ -26,7 +26,6 @@
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
-#include <algorithm>
 
 using namespace std;
 
@@ -87,37 +86,6 @@ size_t JBinaryDataDef::SizeOfType(TpData type){
     case JBinaryDataDef::DatUint3:    ret=sizeof(tuint3);          break;
     case JBinaryDataDef::DatFloat3:   ret=sizeof(tfloat3);         break;
     case JBinaryDataDef::DatDouble3:  ret=sizeof(tdouble3);        break;
-  }
-  return(ret);
-}
-
-//==============================================================================
-/// Devuelve true cuando el tipo es triple.
-/// Returns true when the type is triple.
-//==============================================================================
-bool JBinaryDataDef::TypeIsTriple(TpData type){
-  bool ret=false;
-  switch(type){
-    //case JBinaryDataDef::DatText:
-    case JBinaryDataDef::DatBool:
-    case JBinaryDataDef::DatChar:
-    case JBinaryDataDef::DatUchar:
-    case JBinaryDataDef::DatShort:
-    case JBinaryDataDef::DatUshort:
-    case JBinaryDataDef::DatInt:
-    case JBinaryDataDef::DatUint:
-    case JBinaryDataDef::DatLlong:
-    case JBinaryDataDef::DatUllong:
-    case JBinaryDataDef::DatFloat:
-    case JBinaryDataDef::DatDouble:   
-      ret=false;
-    break;
-    case JBinaryDataDef::DatInt3:
-    case JBinaryDataDef::DatUint3:
-    case JBinaryDataDef::DatFloat3:
-    case JBinaryDataDef::DatDouble3:
-      ret=true;
-    break;
   }
   return(ret);
 }

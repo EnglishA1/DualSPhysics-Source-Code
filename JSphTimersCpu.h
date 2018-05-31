@@ -1,18 +1,19 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file JSphTimersCpu.h \brief Measures time intervals during CPU execution.
@@ -20,7 +21,7 @@
 #ifndef _JSphTimersCpu_
 #define _JSphTimersCpu_
 
-#ifdef DISABLE_TIMERS
+#ifdef _CODE_FAST
   #define TmcStart(x,y) ;
   #define TmcStop(x,y) ;
 #else
@@ -37,23 +38,24 @@ typedef struct{
   double time;
 }StSphTimerCpu; 
 
-typedef enum{
-   TMC_Init=0
-  ,TMC_NlLimits=1
-  ,TMC_NlMakeSort=2
-  ,TMC_NlSortData=3
-  ,TMC_NlOutCheck=4
-  ,TMC_CfPreForces=5
-  ,TMC_CfForces=6
-  ,TMC_SuShifting=7
-  ,TMC_SuComputeStep=8
-  ,TMC_SuFloating=9
-  ,TMC_SuMotion=10
-  ,TMC_SuPeriodic=11
-  ,TMC_SuResizeNp=12
-  ,TMC_SuSavePart=13
-}CsTypeTimerCPU;
-#define TMC_COUNT 14
+  typedef enum{
+     TMC_Init=0
+    ,TMC_NlLimits=1
+    ,TMC_NlMakeSort=2
+    ,TMC_NlSortData=3
+    ,TMC_NlOutCheck=4
+    ,TMC_NlPeriCheck=5
+    ,TMC_NlPeriPrepare=6
+    ,TMC_CfPreForces=7
+    ,TMC_CfForces=8
+    ,TMC_CfShepard=9
+    ,TMC_CfPeriForces=10
+    ,TMC_SuComputeStep=11
+    ,TMC_SuFloating=12
+    ,TMC_SuMotion=13
+    ,TMC_SuSavePart=14
+  }CsTypeTimerCPU;
+  #define TMC_COUNT 15
 
 typedef StSphTimerCpu TimersCpu[TMC_COUNT];
 
@@ -62,24 +64,24 @@ typedef StSphTimerCpu TimersCpu[TMC_COUNT];
 //==============================================================================
 inline const char* TmcGetName(CsTypeTimerCPU ct){
   switch(ct){
-    case TMC_Init:              return("VA-Init");
-    case TMC_NlLimits:          return("NL-Limits");
-    case TMC_NlMakeSort:        return("NL-MakeSort");
-    case TMC_NlSortData:        return("NL-SortData");
-    case TMC_NlOutCheck:        return("NL-OutCheck");
-    case TMC_CfPreForces:       return("CF-PreForces");
-    case TMC_CfForces:          return("CF-Forces");
-    case TMC_SuShifting:        return("SU-Shifting");
-    case TMC_SuComputeStep:     return("SU-ComputeStep");
-    case TMC_SuFloating:        return("SU-Floating");
-    case TMC_SuMotion:          return("SU-Motion");
-    case TMC_SuPeriodic:        return("SU-Periodic");
-    case TMC_SuResizeNp:        return("SU-ResizeNp");
-    case TMC_SuSavePart:        return("SU-SavePart");
+    case TMC_Init:                  return("VA-Init");
+    case TMC_NlLimits:              return("NL-Limits");
+    case TMC_NlMakeSort:            return("NL-MakeSort");
+    case TMC_NlSortData:            return("NL-SortData");
+    case TMC_NlOutCheck:            return("NL-OutCheck");
+    case TMC_NlPeriCheck:           return("NL-PeriCheck");
+    case TMC_NlPeriPrepare:         return("NL-PeriPrepare");
+    case TMC_CfPreForces:           return("CF-PreForces");
+    case TMC_CfForces:              return("CF-Forces");
+    case TMC_CfShepard:             return("CF-Shepard");
+    case TMC_CfPeriForces:          return("CF-PeriForces");
+    case TMC_SuComputeStep:         return("SU-ComputeStep");
+    case TMC_SuFloating:            return("SU-Floating");
+    case TMC_SuMotion:              return("SU-Motion");
+    case TMC_SuSavePart:            return("SU-SavePart");
   }
   return("???");
 }
-
 //==============================================================================
 /// Returns the number of timers.
 //==============================================================================
@@ -117,18 +119,6 @@ inline void _TmcStop(TimersCpu vtimer,CsTypeTimerCPU ct){
     t->time+=t->timer.GetElapsedTimeD();
   }
 }
-
-//==============================================================================
-/// Initialises the time accumulated by all timers.
-//==============================================================================
-inline void TmcResetValues(TimersCpu vtimer){
-  for(unsigned ct=0;ct<TMC_COUNT;ct++)if(vtimer[ct].active)vtimer[ct].time=0; 
-}  
-
-//==============================================================================
-/// Increases the time accumulated manually.
-//==============================================================================
-inline void TmcIncreaseValue(TimersCpu vtimer,CsTypeTimerCPU ct,double value){ if(vtimer[ct].active)vtimer[ct].time+=value; }  
 
 //==============================================================================
 /// Returns the time accumulated by the timer.

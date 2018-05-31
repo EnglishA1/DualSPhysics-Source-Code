@@ -1,18 +1,19 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file JCellDivCpuSingle.cpp \brief Implements the class \ref JCellDivCpuSingle.
@@ -23,276 +24,265 @@
 using namespace std;
 
 //==============================================================================
-/// Constructor.
+// Constructor.
 //==============================================================================
-JCellDivCpuSingle::JCellDivCpuSingle(bool stable,bool floating,byte periactive,TpCellOrder cellorder,TpCellMode cellmode,float scell,tdouble3 mapposmin,tdouble3 mapposmax,tuint3 mapcells,unsigned casenbound,unsigned casenfixed,unsigned casenpb,JLog2 *log,std::string dirout):JCellDivCpu(stable,floating,periactive,cellorder,cellmode,scell,mapposmin,mapposmax,mapcells,casenbound,casenfixed,casenpb,log,dirout){
+JCellDivCpuSingle::JCellDivCpuSingle(bool stable,JLog2 *log,std::string dirout,byte periactive,bool laminarsps,bool usefluiddomain,const tfloat3 &mapposmin,const tfloat3 &mapposmax,float dosh,unsigned casenbound,unsigned casenfixed,unsigned casenpb,TpCellOrder order):JCellDivCpu(stable,log,dirout,periactive,laminarsps,mapposmin,mapposmax,dosh,casenbound,casenfixed,casenpb,order),UseFluidDomain(usefluiddomain){
   ClassName="JCellDivCpuSingle";
 }
 
 //==============================================================================
-/// Calcula limites del dominio en celdas ajustando al fluido (CellDomainMin/Max). 
-/// Si hay alguna particula excluida de tipo boundary (incluidas floating) genera
-/// excepcion y muestra su info.
-/// Calculate limits of domain in cells adjusting to fluid (CellDomainMin/Max). 
-/// If there are some particles excluded of type boundary (including floating) generate
-/// an exception ands show its infor.
+/// Configures object for initial use.
 //==============================================================================
-void JCellDivCpuSingle::CalcCellDomain(const unsigned *dcellc,const word* codec,const unsigned* idpc,const tdouble3* posc){
-  //-Calculate boundary domain / Calcula dominio del contorno.
+void JCellDivCpuSingle::ConfigInit(TpCellMode cellmode,unsigned np,unsigned npb,bool rhopout,float rhopmin,float rhopmax){  
+  Reset();
+  Nptot=Np=np; Npb=npb;
+  RhopOut=rhopout; RhopOutMin=rhopmin; RhopOutMax=rhopmax;
+  CellMode=cellmode;
+  Hdiv=(CellMode==CELLMODE_H? 2: 1);
+  Scell=(CellMode==CELLMODE_H? Dosh/2: (CellMode==CELLMODE_2H? Dosh: Dosh*2));
+  OvScell=1.f/Scell;
+  MapCells=TUint3(unsigned(ceil(MapPosDif.x/Scell)),unsigned(ceil(MapPosDif.y/Scell)),unsigned(ceil(MapPosDif.z/Scell)));
+  //-Allocates memory.
+  AllocMemory(np,MapCells.x*MapCells.y*MapCells.z);
+}
+
+//==============================================================================
+/// Computes limits of the domain in cells adjusting to the fluid CellDomainMin/Max). 
+/// Labels excluded particles in code[].
+//==============================================================================
+void JCellDivCpuSingle::CalcCellDomain(const unsigned* idp,const tfloat3* pos,const float* rhop,word* code){
+  //-Computes domain of the boundary.
   tuint3 celbmin,celbmax;
   if(!BoundLimitOk){
-    CalcCellDomainBound(Npb1,0,Npb2,Npb1+Npf1,dcellc,codec,idpc,posc,celbmin,celbmax);
+    CalcCellDomainBound(Npb,0,idp,pos,code,celbmin,celbmax);
     BoundLimitOk=true; BoundLimitCellMin=celbmin; BoundLimitCellMax=celbmax;
   } 
   else{ celbmin=BoundLimitCellMin; celbmax=BoundLimitCellMax; }
-  //-Calculate fluid domain / Calcula dominio del fluido.
+  //-Computes domain of the fluid.
   tuint3 celfmin,celfmax;
-  CalcCellDomainFluid(Npf1,Npb1,Npf2,Npb1+Npf1+Npb2,dcellc,codec,idpc,posc,celfmin,celfmax);
-  //-Calculate domain adjusting to boundary and fluid (with halo of 2h) / Calcula dominio ajustando al contorno y al fluido (con halo de 2h). 
+  CalcCellDomainFluid(Np-Npb,Npb,idp,pos,rhop,code,celfmin,celfmax);
+    //-Computes domain adjusting to the boundary and the fluid(with 2h halo). 
   MergeMapCellBoundFluid(celbmin,celbmax,celfmin,celfmax,CellDomainMin,CellDomainMax);
 }
 
 //==============================================================================
-/// Combina limite de celdas de contorno y fluido con limites de mapa.
-/// Con UseFluidDomain=TRUE se queda con el dominio del fluido mas 2h si hay 
-/// contorno, en caso contrario se queda con el dominio que incluya fluido y
-/// contorno.
-/// En caso de que el dominio sea nulo CellDomainMin=CellDomainMax=(0,0,0).
-/// Combine limits of boundary and fluid cells with limits of map.
-/// With UseFluidDomain=TRUE staying with the fluid domain pluss 2h if there is a 
-/// a boundary, in the contrary case, stay with domain that includes fluid and
-/// boundary.
-/// In case that the domain is null CellDomainMin=CellDomainMax=(0,0,0).
+/// Combines cell limits of boundary and fluid with map limits.
+/// With UseFluidDomain=TRUE, it uses domain of the fluid plus 2h if there is boundary
+/// if not, it uses the domain with fluid and boundary.
+/// If there is no boundary CellDomainMin=CellDomainMax=(0,0,0).
 //==============================================================================
 void JCellDivCpuSingle::MergeMapCellBoundFluid(const tuint3 &celbmin,const tuint3 &celbmax,const tuint3 &celfmin,const tuint3 &celfmax,tuint3 &celmin,tuint3 &celmax)const{
-  celmin=TUint3(max(min(celbmin.x,celfmin.x),(celfmin.x>=Hdiv? celfmin.x-Hdiv: 0)),max(min(celbmin.y,celfmin.y),(celfmin.y>=Hdiv? celfmin.y-Hdiv: 0)),max(min(celbmin.z,celfmin.z),(celfmin.z>=Hdiv? celfmin.z-Hdiv: 0)));
-  celmax=TUint3(min(max(celbmax.x,celfmax.x),celfmax.x+Hdiv),min(max(celbmax.y,celfmax.y),celfmax.y+Hdiv),min(max(celbmax.z,celfmax.z),celfmax.z+Hdiv));
-  if(celmax.x>=DomCells.x)celmax.x=DomCells.x-1;
-  if(celmax.y>=DomCells.y)celmax.y=DomCells.y-1;
-  if(celmax.z>=DomCells.z)celmax.z=DomCells.z-1;
+  //char cad[256];
+  //sprintf(cad,"celb=(%u,%u,%u)-(%u,%u,%u)  Npb:%u",celbmin.x,celbmin.y,celbmin.z,celbmax.x,celbmax.y,celbmax.z,Npb); Log->Print(cad);
+  //sprintf(cad,"celf=(%u,%u,%u)-(%u,%u,%u)  Np:%u",celfmin.x,celfmin.y,celfmin.z,celfmax.x,celfmax.y,celfmax.z,Np); Log->Print(cad);
+  if(UseFluidDomain){
+    celmin=TUint3(max(min(celbmin.x,celfmin.x),(celfmin.x>=Hdiv? celfmin.x-Hdiv: 0)),max(min(celbmin.y,celfmin.y),(celfmin.y>=Hdiv? celfmin.y-Hdiv: 0)),max(min(celbmin.z,celfmin.z),(celfmin.z>=Hdiv? celfmin.z-Hdiv: 0)));
+    celmax=TUint3(min(max(celbmax.x,celfmax.x),celfmax.x+Hdiv),min(max(celbmax.y,celfmax.y),celfmax.y+Hdiv),min(max(celbmax.z,celfmax.z),celfmax.z+Hdiv));
+    //sprintf(cad,"cel1=(%u,%u,%u)-(%u,%u,%u)",celmin.x,celmin.y,celmin.z,celmax.x,celmax.y,celmax.z); Log->Print(cad);
+  }
+  else{
+    celmin=MinValues(celbmin,celfmin);
+    celmax=MaxValues(celbmax,celfmax);
+    //sprintf(cad,"cel2=(%u,%u,%u)-(%u,%u,%u)",celmin.x,celmin.y,celmin.z,celmax.x,celmax.y,celmax.z); Log->Print(cad);
+  }
+  if(celmax.x>=MapCells.x)celmax.x=MapCells.x-1;
+  if(celmax.y>=MapCells.y)celmax.y=MapCells.y-1;
+  if(celmax.z>=MapCells.z)celmax.z=MapCells.z-1;
   if(celmin.x>celmax.x||celmin.y>celmax.y||celmin.z>celmax.z){ celmin=celmax=TUint3(0,0,0); }
 }
 
 //==============================================================================
-/// Calcula numero de celdas a partir de (CellDomainMin/Max). 
-/// Obtiene localizacion de celdas especiales.
-/// Calculate number of cells starting from (CellDomainMin/Max). 
-/// Get location of special cells.
+/// Computes the number of cells starting from CellDomainMin/Max). 
+/// Computes cell of each particle CellPart[]) starting from its position,
+/// all excluded particles were already labeled in code[] by CalcCellDomain().
+/// Assigns consecutive values to SortPart[].
 //==============================================================================
-void JCellDivCpuSingle::PrepareNct(){
-  //-Calculate number of cells / Calcula numero de celdas.
+void JCellDivCpuSingle::PreSort(const tfloat3* pos,const word* code){
+  //-Computes number of cells.
   Ncx=CellDomainMax.x-CellDomainMin.x+1;
   Ncy=CellDomainMax.y-CellDomainMin.y+1;
   Ncz=CellDomainMax.z-CellDomainMin.z+1;
-  Nsheet=Ncx*Ncy; Nct=Nsheet*Ncz; Nctt=SizeBeginCell(Nct);
-  if(Nctt!=unsigned(Nctt))RunException("PrepareNct","The number of cells is too big.");
-  BoxIgnore=Nct; 
-  BoxFluid=BoxIgnore+1; 
-  BoxBoundOut=BoxFluid+Nct; 
-  BoxFluidOut=BoxBoundOut+1; 
-  BoxBoundOutIgnore=BoxFluidOut+1;
-  BoxFluidOutIgnore=BoxBoundOutIgnore+1;
-}
+  //if(1){ char cad[1024]; sprintf(cad,"---> %u>  ncx:%u ncy:%u ncz:%u\n",Ndiv,Ncx,Ncy,Ncz); Log->Print(cad); }
+  Nsheet=Ncx*Ncy; Nct=Nsheet*Ncz; Nctt=SizeBeginCell(Nct)-1;
+  BoxIgnore=Nct; BoxFluid=BoxIgnore+1; BoxBoundOut=BoxFluid+Nct; BoxFluidOut=BoxBoundOut+1;
+  const tfloat3 dposmin=MapPosMin+TFloat3(Scell*CellDomainMin.x,Scell*CellDomainMin.y,Scell*CellDomainMin.z);
+  const tfloat3 dposdif=TFloat3(Scell*Ncx,Scell*Ncy,Scell*Ncz);
 
-//==============================================================================
-/// Calcula celda de cada particula bound y fluid (cellpart[]) a partir de su celda en
-/// mapa, todas las particulas excluidas ya fueron marcadas en code[].
-/// No puede haber particulas bound o floating excluidas porque en tal caso ya se 
-/// genera una excepcion en LimitsCellBound/Fluid().
-/// Contabiliza particulas por celda (partsincell[]).
-/// Calculate cell of each boundary and fluid particle (cellpart[]) starting from its cell in 
-/// the map,all the excluded particles are already going to be marked in code[].
-/// It cannot have particles excluded bound or fluid because in such a case 
-/// an exception is already generaed in LimitsCellBound/Fluid().
-/// Account for particles for cell (partsincell[]).
-//==============================================================================
-void JCellDivCpuSingle::PreSortFull(unsigned np,const unsigned *dcellc,const word* codec,unsigned* cellpart,unsigned* partsincell)const{
-  memset(partsincell,0,sizeof(unsigned)*(Nctt-1));
-  for(unsigned p=0;p<np;p++){
-    unsigned rcell=dcellc[p];
-    unsigned cx=PC__Cellx(DomCellCode,rcell)-CellDomainMin.x;
-    unsigned cy=PC__Celly(DomCellCode,rcell)-CellDomainMin.y;
-    unsigned cz=PC__Cellz(DomCellCode,rcell)-CellDomainMin.z;
-    const unsigned cellsort=cx+cy*Ncx+cz*Nsheet;
-    const word rcode=codec[p];
-    const bool xbound=(CODE_GetType(rcode)<CODE_TYPE_FLOATING);
-    const word codeout=CODE_GetSpecialValue(rcode);
-    unsigned box;
-    if(xbound){//-Bound particles (except floating) / Particulas bound (excepto floating).
-      box=(codeout<CODE_OUTIGNORE? ((cx<Ncx && cy<Ncy && cz<Ncz)? cellsort: BoxIgnore): (codeout==CODE_OUTIGNORE? BoxBoundOutIgnore: BoxBoundOut));
-    }
-    else{//-Fluid particles / Particulas fluid.
-      box=(codeout<CODE_OUTIGNORE? BoxFluid+cellsort: (codeout==CODE_OUTIGNORE? BoxFluidOutIgnore: BoxFluidOut));
-    }
-    cellpart[p]=box;
-    partsincell[box]++;
-  }
-}
-
-//==============================================================================
-/// Calcula celda de cada particula bound y fluid (cellpart[]) a partir de su celda en
-/// mapa, todas las particulas excluidas ya fueron marcadas en code[].
-/// No puede haber particulas bound o floating excluidas porque en tal caso ya se 
-/// genera una excepcion en LimitsCellBound/Fluid().
-/// Contabiliza particulas por celda (partsincell[]).
-/// Calculate cell of each boundary and fluid particle (cellpart[]) starting from its cell in 
-/// the map, all the excluded particles are already going to be marked in code[].
-/// It cannot have particles excluded bound or floating because in such a case 
-/// an exception is already generaed in LimitsCellBound/Fluid().
-/// Account for particles for cell (partsincell[]).
-//==============================================================================
-void JCellDivCpuSingle::PreSortFluid(unsigned np,unsigned pini,const unsigned *dcellc,const word* codec,unsigned* cellpart,unsigned* partsincell)const{
-  memset(partsincell+BoxFluid,0,sizeof(unsigned)*(Nctt-1-BoxFluid));
-  const unsigned pfin=pini+np;
-  for(unsigned p=pini;p<pfin;p++){
-    unsigned rcell=dcellc[p];
-    unsigned cx=PC__Cellx(DomCellCode,rcell)-CellDomainMin.x;
-    unsigned cy=PC__Celly(DomCellCode,rcell)-CellDomainMin.y;
-    unsigned cz=PC__Cellz(DomCellCode,rcell)-CellDomainMin.z;
-    const unsigned cellsort=BoxFluid+cx+cy*Ncx+cz*Nsheet;
-    const word codeout=CODE_GetSpecialValue(codec[p]);
-    unsigned box=(codeout<CODE_OUTIGNORE? cellsort: (codeout==CODE_OUTIGNORE? BoxFluidOutIgnore: BoxFluidOut));
-    cellpart[p]=box;
-    partsincell[box]++;
-  }
-}
-
-//==============================================================================
-/// Calcula SortPart[] (donde esta la particula que deberia ir en dicha posicion).
-/// Si hay particulas de contorno excluidas no hay ningun problema.
-/// Calculate SortPart[] (where the particle is that must go in stated position).
-/// If there are no excluded boundary particles, no problem exists.
-//==============================================================================
-void JCellDivCpuSingle::MakeSortFull(const unsigned* cellpart,unsigned* begincell,unsigned* partsincell,unsigned* sortpart)const{
-  //-Adjust initial position of cells / Ajusta posiciones iniciales de celdas.
-  begincell[0]=0;
-  for(unsigned box=0;box<Nctt-1;box++)begincell[box+1]=begincell[box]+partsincell[box];
-  //-Put particles in their boxes / Coloca las particulas en sus cajas.
-  memset(partsincell,0,sizeof(unsigned)*(Nctt-1));
-  for(unsigned p=0;p<Nptot;p++){
-    unsigned box=cellpart[p];
-    sortpart[begincell[box]+partsincell[box]]=p;
-    partsincell[box]++;
-  }
-}
-
-//==============================================================================
-/// Calcula SortPart[] (donde esta la particula que deberia ir en dicha posicion).
-/// En este caso nunca hay particulas bound excluidas pq se genera excepcion.
-/// Calculate SortPart[] (where the particle is that must go in stated position).
-/// In this case, there are mp excluded boundary particles because an exception is generated.
-//==============================================================================
-void JCellDivCpuSingle::MakeSortFluid(unsigned np,unsigned pini,const unsigned* cellpart,unsigned* begincell,unsigned* partsincell,unsigned* sortpart)const{
-  //-Adjust initial position of cells / Ajusta posiciones iniciales de celdas.
-  for(unsigned box=BoxFluid;box<Nctt-1;box++)begincell[box+1]=begincell[box]+partsincell[box];
-  //-Put particles in their boxes / Coloca las particulas en sus cajas.
-  memset(partsincell+BoxFluid,0,sizeof(unsigned)*(Nctt-1-BoxFluid));
-  const unsigned pfin=pini+np;
-  for(unsigned p=pini;p<pfin;p++){
-    unsigned box=cellpart[p];
-    sortpart[begincell[box]+partsincell[box]]=p;
-    partsincell[box]++;
-  }
-}
-
-//==============================================================================
-/// Calcula celda de cada particula (CellPart[]) a partir de cell[], todas las
-/// particulas excluidas ya fueron marcadas en code[].
-/// Calcula SortPart[] (donde esta la particula que deberia ir en dicha posicion).
-/// Calculate cell of each particle (CellPart[]) starting from cell[], all the
-/// excluded particles will already be marked in code[].
-/// Calculate SortPart[] (where the particle is that must go in stated position).
-//==============================================================================
-void JCellDivCpuSingle::PreSort(const unsigned* dcellc,const word* codec){
-  //-Carga SortPart[] con la p actual en los vectores de datos donde esta la particula que deberia ir en dicha posicion.
-  //-Carga BeginCell[] con primera particula de cada celda.
-  //-Load SortPart[] with the current particle in the data vectors where the particle is that must go in stated position.
-  //-Load BeginCell[] with first particle of each cell.
+  //-Loads SortPart[] with the current p in the arrays of data where the particle that should be in that position is.
+  //-Loads BeginCell[] with the first particles of each cell.
   if(DivideFull){
-    PreSortFull(Nptot,dcellc,codec,CellPart,PartsInCell);
-    MakeSortFull(CellPart,BeginCell,PartsInCell,SortPart);
+    memset(PartsInCell,0,sizeof(unsigned)*Nctt);
+    PreSortBound(pos,code,dposmin,dposdif);
+    PreSortFluid(pos,code,dposmin,dposdif);
+    MakeSortFull();
   }
   else{
-    PreSortFluid(Npf1,Npb1,dcellc,codec,CellPart,PartsInCell);
-    MakeSortFluid(Npf1,Npb1,CellPart,BeginCell,PartsInCell,SortPart);
+    memset(PartsInCell+BoxFluid,0,sizeof(unsigned)*(Nctt-BoxFluid));
+    PreSortFluid(pos,code,dposmin,dposdif);
+    MakeSortFluid();
   }
-  SortArray(CellPart); //-Order values of CellPart[] / Ordena valores de CellPart[].
 }
 
 //==============================================================================
-/// Inicia proceso de Divide: Calcula limites de dominio y calcula nueva posicion
-/// para cada particula (SortPart).
-/// El valor np incluye las periodicas bound y fluid (npbper y npfper).
-/// Las floating se tratan como si fuesen fluido (tanto al ser excluidas como 
-/// ignoradas), pero en caso de haber alguna floating excluida se genera una 
-/// excepcion en CalcCellDomainFluid();
-/// Initial process of Divide: Calculate limits of domain and calculate new position
-/// for each particle (SortPart).
-/// The value np includes periodic bound & fluid particles (npbper & npfper).
-/// Floating particles are treated as if they are fluid (as such they are to be excluded & effectively 
-/// ignored), but in case of some excluding floating particles an exception is generated 
-/// in CalcCellDomainFluid();
+/// Computes cell of each boundary particle and counts particles per cell.
 //==============================================================================
-void JCellDivCpuSingle::Divide(unsigned npb1,unsigned npf1,unsigned npb2,unsigned npf2,bool boundchanged,const unsigned *dcellc,const word* codec,const unsigned* idpc,const tdouble3* posc,TimersCpu timers){
+void JCellDivCpuSingle::PreSortBound(const tfloat3* pos,const word* code,const tfloat3 &dposmin,const tfloat3 &dposdif){
+  for(unsigned p=0;p<Npb;p++){
+    const float px=pos[p].x,py=pos[p].y,pz=pos[p].z;
+    const float dx=px-dposmin.x,dy=py-dposmin.y,dz=pz-dposmin.z;
+    unsigned cx=unsigned(dx*OvScell),cy=unsigned(dy*OvScell),cz=unsigned(dz*OvScell);
+    if(cx>=Ncx)cx=Ncx-1; if(cy>=Ncy)cy=Ncy-1; if(cz>=Ncz)cz=Ncz-1;
+    unsigned box=(!CODE_GetOutValue(code[p])? ((dx>=0 && dy>=0 && dz>=0 && dx<dposdif.x && dy<dposdif.y && dz<dposdif.z)? cx+cy*Ncx+cz*Nsheet: BoxIgnore): BoxBoundOut);
+    CellPart[p]=box;
+    PartsInCell[box]++;
+  }
+}
+
+//==============================================================================
+/// Computes cell of each fluid particle and counts particles per cell.
+//==============================================================================
+void JCellDivCpuSingle::PreSortFluid(const tfloat3* pos,const word* code,const tfloat3 &dposmin,const tfloat3 &dposdif){
+  for(unsigned p=Npb;p<Np;p++){
+    const float px=pos[p].x,py=pos[p].y,pz=pos[p].z;
+    const float dx=px-dposmin.x,dy=py-dposmin.y,dz=pz-dposmin.z;
+    unsigned cx=unsigned(dx*OvScell),cy=unsigned(dy*OvScell),cz=unsigned(dz*OvScell);
+    if(cx>=Ncx)cx=Ncx-1; if(cy>=Ncy)cy=Ncy-1; if(cz>=Ncz)cz=Ncz-1;
+    unsigned box=(!CODE_GetOutValue(code[p])? BoxFluid+cx+cy*Ncx+cz*Nsheet: BoxFluidOut);
+    CellPart[p]=box;
+    PartsInCell[box]++;
+  }
+}
+
+//==============================================================================
+/// Computes SortPart[] (where is the particle that should be in that position).
+/// No problem when there are excluded boundary particles.
+//==============================================================================
+void JCellDivCpuSingle::MakeSortFull(){
+  //-Adjusts initial positions of cells.
+  BeginCell[0]=0;
+  for(unsigned box=0;box<Nctt;box++)BeginCell[box+1]=BeginCell[box]+PartsInCell[box];
+  //-Places particles in their boxes.
+  memset(PartsInCell,0,sizeof(unsigned)*Nctt);
+  for(unsigned p=0;p<Np;p++){
+    unsigned box=CellPart[p];
+    SortPart[BeginCell[box]+PartsInCell[box]]=p;
+    PartsInCell[box]++;
+  }
+  //-Orders values of CellPart[].
+  SortParticles(CellPart);
+}
+
+//==============================================================================
+/// Computes SortPart[] (where is the particle that should be in that position).
+/// There are not excluded boundary particles.
+//==============================================================================
+void JCellDivCpuSingle::MakeSortFluid(){
+  //-Adjusts initial positions of cells.
+  for(unsigned box=BoxFluid;box<Nctt;box++)BeginCell[box+1]=BeginCell[box]+PartsInCell[box];
+  //-Places particles in their boxes.
+  memset(PartsInCell+BoxFluid,0,sizeof(unsigned)*(Nctt-BoxFluid));
+  for(unsigned p=Npb;p<Np;p++){
+    unsigned box=CellPart[p];
+    SortPart[BeginCell[box]+PartsInCell[box]]=p;
+    PartsInCell[box]++;
+  }
+  //-Orders values of CellPart[].
+  SortParticles(CellPart);
+}
+
+//==============================================================================
+/// Division of particles in cells.
+//==============================================================================
+void JCellDivCpuSingle::Divide(bool boundchanged,const unsigned* idp,const tfloat3* pos,const float* rhop,word* code,TimersCpu timers){
   const char met[]="Divide";
-  DivideFull=false;
   TmcStart(timers,TMC_NlLimits);
-
-  //-Establish number of particles / Establece numero de particulas.
-  Npb1=npb1; Npf1=npf1; Npb2=npb2; Npf2=npf2;
-  Nptot=Npb1+Npf1+Npb2+Npf2;
-  NpbOut=NpfOut=NpbOutIgnore=NpfOutIgnore=0;
-  NpFinal=NpbFinal=0;
-  NpfOutRhop=NpfOutMove=NpbIgnore=0;
-
-  //-Check if there is memory reserved and if it sufficient for Nptot / Comprueba si hay memoria reservada y si es suficiente para Nptot.
-  CheckMemoryNp(Nptot);
-
-  //- Si la posicion del contorno cambia o hay condiciones periodicas es necesario recalcular limites y reordenar todas las particulas. 
-  //- If the position of the boundary changes or there are periodic conditions it is necessary to recalculate the limits & reorder all the particles. 
-  if(boundchanged || PeriActive){
+  //-If the position of the boundary changes, it is necessary to recompute limits and reorder particles. 
+  if(boundchanged){
     BoundLimitOk=BoundDivideOk=false;
     BoundLimitCellMin=BoundLimitCellMax=TUint3(0);
     BoundDivideCellMin=BoundDivideCellMax=TUint3(0);
   }
-
-  //-Calculate domain limits / Calcula limites del dominio.
-  CalcCellDomain(dcellc,codec,idpc,posc);
-  //-Calculate number of cells for divide and check reservation of memory for cells  / Calcula numero de celdas para el divide y comprueba reserva de memoria para celdas.
-  PrepareNct();
-  //-Check is there is memory reserved and if it is sufficient for Nptot / Comprueba si hay memoria reservada y si es suficiente para Nptot.
-  CheckMemoryNct(Nct);
+  Nptot=Np;
+  NpbOut=NpfOut=NpfOutRhop=NpfOutMove=NpbIgnore=0;
+  //-Computes limits of the domain.
+  CalcCellDomain(idp,pos,rhop,code);
   TmcStop(timers,TMC_NlLimits);
 
-  //-Determina si el divide afecta a todas las particulas.
-  //-BoundDivideOk se vuelve false al reservar o liberar memoria para particulas o celdas.
-  //-Determine if divide affects all the particles.
-  //-BoundDivideOk returns false in order to reserve or free memory for particles or cells.
-  if(!BoundDivideOk || BoundDivideCellMin!=CellDomainMin || BoundDivideCellMax!=CellDomainMax){
+  //-Determines if divide affects to all particles.
+  TmcStart(timers,TMC_NlMakeSort);
+  if(!BoundDivideOk||BoundDivideCellMin!=CellDomainMin||BoundDivideCellMax!=CellDomainMax){
     DivideFull=true;
     BoundDivideOk=true; BoundDivideCellMin=CellDomainMin; BoundDivideCellMax=CellDomainMax;
   }
   else DivideFull=false;
+//  if(DivideFull)Log->PrintDbg("--> DivideFull=TRUE"); else Log->PrintDbg("--> DivideFull=FALSE");
+  //Log->PrintDbg(string("--> ")+fun::UintStr(Ndiv)+string("> CellDomain:")+fun::Uint3RangeStr(CellDomainMin,CellDomainMax));
 
-  //- Calcula CellPart[] y SortPart[] (donde esta la particula que deberia ir en dicha posicion).
-  //- Calculate CellPart[] and SortPart[] ((where the particle is that must go in stated position)).
-  TmcStart(timers,TMC_NlMakeSort);
-  PreSort(dcellc,codec);
-
-  //-Calculate number of particles / Calcula numeros de particulas.
+  PreSort(pos,code);
+  //-Updates number of particles.
   NpbIgnore=CellSize(BoxIgnore);
-  NpbOut=CellSize(BoxBoundOut);
-  if(NpbOut)RunException(met,"There cannot be excluded boundary particles.");
+  //NpbOut=CellSize(BoxBoundOut); //-Always zero, if not it throws exception inCalcCellDomainBound().
   NpfOut=CellSize(BoxFluidOut);
-  NpbOutIgnore=CellSize(BoxBoundOutIgnore);
-  NpfOutIgnore=CellSize(BoxFluidOutIgnore);
-  NpFinal=Nptot-NpbOut-NpfOut-NpbOutIgnore-NpfOutIgnore;
-  NpbFinal=Npb1+Npb2-NpbOut-NpbOutIgnore;
-
+  //printf("---> Nct:%u  BoxBoundOut:%u  SizeBeginEndCell:%u\n",Nct,BoxBoundOut,SizeBeginEndCell(Nct));
+  //printf("---> NpbIgnore:%u  NpbOut:%u  NpfOut:%u\n",NpbIgnore,NpbOut,NpfOut);
+  Np=Nptot-NpbOut-NpfOut;
+  //DgSaveCsvBeginCell("BeginCell.csv",Ndiv);
   Ndiv++;
   if(DivideFull)NdivFull++;
   TmcStop(timers,TMC_NlMakeSort);
+
 }
+
+
+//==============================================================================
+/// Stores CSV file with particle data.
+//==============================================================================
+/*void JCellDivCpuSingle::DgSaveCsvBeginCell(std::string filename,int numfile){
+  const char met[]="DgSaveCsvBeginCell";
+  int mpirank=Log->GetMpiRank();
+  if(mpirank>=0)filename=string("p")+fun::IntStr(mpirank)+"_"+filename;
+  if(numfile>=0){
+    string ext=fun::GetExtension(filename);
+    filename=fun::GetWithoutExtension(filename);
+    char cad[64];
+    sprintf(cad,"%04d",numfile);
+    filename=filename+cad+"."+ext;
+  }
+  filename=DirOut+filename;
+  //-Generates CSV file.
+  ofstream pf;
+  pf.open(filename.c_str());
+  if(pf){
+    char cad[1024];
+    sprintf(cad,"Ncx:%u;Ncy:%u;Ncz:%u;Nct:%u",Ncx,Ncy,Ncz,Nct);  pf << cad << endl;
+    pf << "Cell;Cellxyz;Value" << endl;
+    unsigned dif=0;
+    for(unsigned c=0;c<Nctt;c++){
+      if(c==BoxBoundOut)dif++;
+      else{
+        pf << fun::UintStr(c-dif);
+        if(c==BoxIgnore)pf<< ";BoxIgnore";
+        else if(c==BoxBoundOut)pf<< ";BoxBoundOut";
+        else if(c==BoxFluidOut)pf<< ";BoxFluidOut";
+        else if(c>BoxFluidOut)pf<< ";???";
+        else{
+          unsigned box=(c<BoxFluid? c: c-BoxFluid);
+          const int cz=int(box/Nsheet);
+          int bx=box-(cz*Nsheet);
+          const int cy=int(bx/Ncx);
+          const int cx=bx-(cy*Ncx);
+          sprintf(cad,";%c_%u_%u_%u",(c<BoxFluid? 'B': 'F'),cx,cy,cz);
+          pf<< cad;
+        }
+        pf << endl;
+      }
+    }
+    if(pf.fail())RunException(met,"Failed writing to file.",filename);
+    pf.close();
+  }
+  else RunException(met,"File could not be opened.",filename);
+}*/
+
 
 
 

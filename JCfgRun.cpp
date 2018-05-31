@@ -1,18 +1,19 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file JCfgRun.cpp \brief Implements the class \ref JCfgRun.
@@ -20,12 +21,8 @@
 #include "JCfgRun.h"
 #include "JSpaceEParms.h"
 
-using std::string;
-using std::ifstream;
-using fun::PrintVar;
-using fun::VarStr;
-using fun::StrTrim;
-using fun::StrUpper;
+using namespace std;
+using namespace fun;
 
 //==============================================================================
 /// Constructor.
@@ -43,27 +40,30 @@ void JCfgRun::Reset(){
   Cpu=false;
   Gpu=false; GpuId=-1; GpuFree=false;
   Stable=false;
-  PosDouble=-1;
   OmpThreads=0;
-  BlockSizeMode=BSIZEMODE_Empirical;
+  OmpMode=OMPM_Single;
+  #ifdef _WITHOMP
+    OmpMode=OMPM_Static;
+  #endif
   SvTimers=true;
   CellOrder=ORDER_None;
-  CellMode=CELLMODE_2H;
+  CellMode=CELLMODE_None;
   DomainMode=0;
-  DomainParticlesMin=DomainParticlesMax=TDouble3(0);
-  DomainParticlesPrcMin=DomainParticlesPrcMax=TDouble3(0);
-  DomainFixedMin=DomainFixedMax=TDouble3(0);
+  DomainParticlesMin=DomainParticlesMax=TFloat3(0);
+  DomainParticlesPrcMin=DomainParticlesPrcMax=TFloat3(0);
+  DomainFixedMin=DomainFixedMax=TFloat3(0);
   TStep=STEP_None; VerletSteps=-1;
   TKernel=KERNEL_None;
-  TVisco=VISCO_None; Visco=0; ViscoBoundFactor=-1;
+  TVisco=VISCO_None; Visco=0;
+  ShepardSteps=-1;
   DeltaSph=-1;
-  Shifting=-1;
   SvRes=true; SvDomainVtk=false;
-  Sv_Binx=false; Sv_Info=false; Sv_Vtk=false; Sv_Csv=false;
+  Sv_Binx=false; Sv_Vtk=false; Sv_Csv=false; Sv_Info=false; 
   CaseName=""; DirOut=""; RunName=""; 
   PartBegin=0; PartBeginFirst=0; PartBeginDir="";
   TimeMax=-1; TimePart=-1;
-  RhopOutModif=false; RhopOutMin=700; RhopOutMax=1300;
+  RhopOutModif=false; RhopOutMin=100; RhopOutMax=3000;
+  PtxasFile="";
   FtPause=-1;
 }
 
@@ -72,56 +72,49 @@ void JCfgRun::Reset(){
 //==============================================================================
 void JCfgRun::VisuInfo()const{
   printf("Information about execution parameters:\n\n");
-  printf("  DualSPHysics4 [name_case [dir_out]] [options]\n\n");
+  printf("  DualSPHysics [name_case [dir_out]] [options]\n\n");
   printf("  Options:\n");
   printf("    -h          Shows information about parameters\n\n");
   printf("    -opt <file> Loads a file configuration\n\n");
-  printf("    -cpu        Execution on CPU (option by default)\n");
-  printf("    -gpu[:id]   Execution on GPU and id of the device\n");
-  printf("    -stable     The result is always the same but the execution is slower\n");
+  printf("    -cpu        Execution on Cpu (option by default)\n");
+  printf("    -gpu[:id]   Execution on Gpu and id of the device\n");
+  printf("    -stable     Ensures the same results when repeated the same simulation\n");
   printf("\n");
-  printf("    -posdouble:<mode>  Precision used in position for particle interactions\n");
-  printf("        0: Use and store in single precision (option by default)\n");
-  printf("        1: Use double precision but saves result in single precision\n");
-  printf("        2: Use and store in double precision\n");
-  printf("\n");
+
 #ifdef _WITHOMP
-  printf("    -ompthreads:<int>  Only for CPU execution, indicates the number of threads\n");
-  printf("                   by host for parallel execution, this takes the number of \n");
-  printf("                   cores of the device by default (or using zero value)\n\n");
+  printf("    -ompthreads:<int>  Only for Cpu execution, indicates the number of threads\n");
+  printf("                   by host for parallel execution, it takes the number of \n");
+  printf("                   cores of the device by default (or using zero value)\n");
+  printf("    -ompdynamic    Parallel execution with symmetry in interaction \n");
+  printf("                   and dynamic load balancing\n");
+  printf("    -ompstatic     Parallel execution with symmetry in interaction \n");
+  printf("                   and static load balancing\n\n");
 #endif
-  printf("    -blocksize:<mode>  Defines BlockSize to use in particle interactions on GPU\n");
-  printf("        0: Fixed value (128) is used (option by default)\n");
-  printf("        1: Optimum BlockSize indicated by Occupancy Calculator of CUDA\n");
-  printf("        2: Optimum BlockSize is calculated empirically (option by default)\n\n");
-  //printf("    -cellorder:<axis> Indicates the order of the axes. (xyz/xzy/yxz/yzx/zxy/zyx)\n");
-  printf("    -cellmode:<mode>  Specifies the cell division mode\n");
-  printf("        2h        Lowest and the least expensive in memory (by default)\n");
-  printf("        h         Fastest and the most expensive in memory\n\n");
+  printf("    -cellorder:<axis> Indicates the order of the axis. (xyz/xzy/yxz/yzx/zxy/zyx)\n");
+  printf("    -cellmode:<mode>  Specifies the cell division mode, by default, the fastest\n");
+  printf("     mode is chosen \n");
+  printf("        h         fastest and the most expensive in memory\n");
+  printf("        2h        lowest and the least expensive in memory \n\n");
   printf("    -symplectic      Symplectic algorithm as time step algorithm\n");
   printf("    -verlet[:steps]  Verlet algorithm as time step algorithm and number of\n");
   printf("                     time steps to switch equations\n\n");
-  printf("    -cubic           Cubic spline kernel\n");
-  printf("    -wendland        Wendland kernel\n\n");
-  printf("    -viscoart:<float>          Artificial viscosity [0-1]\n");
-  printf("    -viscolamsps:<float>       Laminar+SPS viscosity [order of 1E-6]\n");  
-  printf("    -viscoboundfactor:<float>  Multiplies the viscosity value of boundary\n");
+  printf("    -cubic      Cubic spline kernel\n");
+  printf("    -wendland   Wendland kernel\n\n");
+  printf("    -viscoart:<float>      Artifitical viscosity [0-1]\n");
+  printf("    -viscolamsps:<float>   Laminar+SPS viscosity [order of 1E-6]\n");  
   printf("\n");
-  printf("    -deltasph:<float> Constant for DeltaSPH. Typical value is 0.1 (0 by default)\n\n");
-  printf("    -shifting:<mode> Specifies the use of Shifting correction\n");
-  printf("        none       Shifting is disabled (by default)\n");
-  printf("        nobound    Shifting is not applied near boundary\n");
-  printf("        nofixed    Shifting is not applied near fixed boundary\n");
-  printf("        full       Shifting is always applied\n\n");
-  printf("    -sv:[formats,...] Specifies the output formats.\n");
-  printf("        none    No particles files are generated\n");
-  printf("        binx    Binary files (option by default)\n");
-  printf("        info    Information about execution in .ibi4 format\n");
+  printf("    -shepard:steps    Shepard filter and number of steps to be applied\n");
+  printf("    -deltasph:<float> Constant for DeltaSPH. By default 0.1 and 0 to disable\n\n");
+  printf("    -sv:[formas,...] Specifies the output formats\n");
+  printf("        none    No files with particle data are generated\n");
+  printf("        binx    Bynary files (option by default)\n");
   printf("        vtk     VTK files\n");
+  printf("        info    Information about execution in ibi4 format\n");
   printf("        csv     CSV files\n");
-  printf("    -svres:<0/1>     Generates file that summarises the execution process\n");
+  printf("    -svdt:<0/1>      Generates file with information about the time step dt\n");
+  printf("    -svres:<0/1>     Generates file that summarizes the execution process\n");
   printf("    -svtimers:<0/1>  Obtains timing for each individual process\n");
-  printf("    -svdomainvtk:<0/1>  Generates VTK file with domain limits\n");
+  printf("    -svdomainvtk:<0/1>  Generate VTK file with domain limits\n");
   printf("    -name <string>      Specifies path and name of the case \n");
   printf("    -runname <string>   Specifies name for case execution\n");
   printf("    -dirout <dir>       Specifies the out directory \n\n");
@@ -129,19 +122,24 @@ void JCfgRun::VisuInfo()const{
   printf("     Specifies the beginning of the simulation starting from a given PART\n");
   printf("     (begin) and located in the directory (dir), (first) indicates the\n");
   printf("     number of the first PART to be generated\n\n");
-  printf("    -incz:<float>    Allows increase in Z+ direction \n");
+  printf("    -incz:<float>    Allowable increase in Z+ direction \n");
   printf("    -rhopout:min:max Excludes fluid particles out of these density limits\n\n");
   printf("    -ftpause:<float> Time to start floating bodies movement. By default 0\n");
-  printf("    -tmax:<float>   Maximum time of simulation\n");
-  printf("    -tout:<float>   Time between output files\n\n");
-  printf("    -domain_particles[:xmin,ymin,zmin,xmax,ymax,zmax]  The domain is fixed as\n");
-  printf("     a function of the initial article positions and modified for xmin,...\n");
-  printf("    -domain_particles_prc:xmin,ymin,zmin,xmax,ymax,zmax  The values in \n");
-  printf("     proportion with the case dimensions according to the initial particles\n");
-  printf("    -domain_fixed:xmin,ymin,zmin,xmax,ymax,zmax    The domain is fixed\n");
-  printf("     with the specified values\n\n");
+  printf("    -tmax:<float>    Maximum time of simulation\n");
+  printf("    -tout:<float>    Time between output files\n\n");
+  printf("    -domain_particles[:xmin,ymin,zmin,xmax,ymax,zmax]  Case domain is\n");
+  printf("     fixed as function of the initial particles and it is modified by xmin,...\n");
+  printf("    -domain_particles_prc:xmin,ymin,zmin,xmax,ymax,zmax  Case domain is\n");
+  printf("     fixed with values in proportion to the dimensions of the case \n");
+  printf("     according to the initial particles\n");
+  printf("    -domain_fixed:xmin,ymin,zmin,xmax,ymax,zmax Case domain is fixed\n");
+  printf("     with the given values\n\n");
+  printf("    -ptxasfile <file> Indicates the file with information about the compilation\n");
+  printf("     of kernels in CUDA to adjust the size of the blocks depending on the \n");
+  printf("     needed registers for each kernel (only for gpu)\n\n");
   printf("  Examples:\n");
-  printf("    DualSPHysics4 case out_case -sv:binx,csv \n");
+  printf("    DualSPHysics case out_case -sv:binx2,csv \n");
+  printf("    DualSPHysics case -gpu -svdt:1 \n\n");
 }
 
 //==============================================================================
@@ -160,9 +158,8 @@ void JCfgRun::VisuConfig()const{
   printf("  %s  %s\n",VarStr("Gpu",Gpu).c_str(),VarStr("GpuId",GpuId).c_str());
   PrintVar("  GpuFree",GpuFree,ln);
   PrintVar("  Stable",Stable,ln);
-  PrintVar("  PosDouble",PosDouble,ln);
   PrintVar("  OmpThreads",OmpThreads,ln);
-  PrintVar("  BlockSize",BlockSizeMode,ln);
+  PrintVar("  OmpMode",GetNameOmpMode(OmpMode),ln);
   PrintVar("  CellOrder",GetNameCellOrder(CellOrder),ln);
   PrintVar("  CellMode",GetNameCellMode(CellMode),ln);
   PrintVar("  TStep",TStep,ln);
@@ -170,21 +167,18 @@ void JCfgRun::VisuConfig()const{
   PrintVar("  TKernel",TKernel,ln);
   PrintVar("  TVisco",TVisco,ln);
   PrintVar("  Visco",Visco,ln);
-  PrintVar("  ViscoBoundFactor",ViscoBoundFactor,ln);
+  PrintVar("  ShepardSteps",ShepardSteps,ln);
   PrintVar("  DeltaSph",DeltaSph,ln);
-  PrintVar("  Shifting",Shifting,ln);
   PrintVar("  SvRes",SvRes,ln);
   PrintVar("  SvTimers",SvTimers,ln);
   PrintVar("  SvDomainVtk",SvDomainVtk,ln);
   PrintVar("  Sv_Binx",Sv_Binx,ln);
-  PrintVar("  Sv_Info",Sv_Info,ln);
   PrintVar("  Sv_Vtk",Sv_Vtk,ln);
   PrintVar("  Sv_Csv",Sv_Csv,ln);
+  PrintVar("  Sv_Info",Sv_Info,ln);
   PrintVar("  RhopOutModif",RhopOutModif,ln);
-  if(RhopOutModif){
-    PrintVar("  RhopOutMin",RhopOutMin,ln);
-    PrintVar("  RhopOutMax",RhopOutMax,ln);
-  }
+  PrintVar("  RhopOutMin",RhopOutMin,ln);
+  PrintVar("  RhopOutMax",RhopOutMax,ln);
   PrintVar("  TimeMax",TimeMax,ln);
   PrintVar("  TimePart",TimePart,ln);
   if(DomainMode==1){
@@ -197,6 +191,7 @@ void JCfgRun::VisuConfig()const{
     PrintVar("  DomainFixedMin",DomainFixedMin,ln);
     PrintVar("  DomainFixedMax",DomainFixedMax,ln);
   }
+  PrintVar("  PtxasFile",PtxasFile,ln);
   PrintVar("  FtPause",FtPause,ln);
 }
 
@@ -212,6 +207,7 @@ void JCfgRun::LoadArgv(int argc,char** argv){
   for(int c=0;c<argc-1;c++){
     string tex=StrTrim(argv[c+1]);
     int pos=int(tex.find(" "));
+    //printf("tex[%s] pos:%d\n",tex.c_str(),pos);
     if(pos>0){
       while(pos>0){
         if(optn>=MAXOPTS)RunException(met,"It has exceeded the maximum configuration options.");
@@ -223,14 +219,17 @@ void JCfgRun::LoadArgv(int argc,char** argv){
     if(optn>=MAXOPTS)RunException(met,"It has exceeded the maximum configuration options.");
     optlis[optn]=tex; optn++;
   }
+  //for(int c=0;c<optn;c++)printf("[%d]=[%s]\n",c,optlis[c].c_str());
   if(optn)LoadOpts(optlis,optn,0,"");
   delete[] optlis;
   if(!optn)PrintInfo=true;
-  if(!PrintInfo){ //-Configuracion por defecto //-default configuration
+  if(!PrintInfo){ //-Configuration by default.
     if(!Cpu&&!Gpu)Cpu=true;
-    if(!SvDef){ Sv_Binx=true; Sv_Info=true; }
+    if(!SvDef)Sv_Binx=true;
   }
   else VisuInfo();
+  //if(PtxasFile.empty())PtxasFile=GetDirWithSlash(GetDirParent(argv[0]))+"ptxas_info.out";
+  if(PtxasFile.empty())PtxasFile=GetWithoutExtension(argv[0])+"_ptxasinfo";
 }
 
 //==============================================================================
@@ -238,6 +237,7 @@ void JCfgRun::LoadArgv(int argc,char** argv){
 //==============================================================================
 void JCfgRun::LoadFile(string fname,int lv){
   const char met[]="LoadFile";
+  //printf("\nFile:[%s] lv:%d\n",fname.c_str(),lv);
   const int MAXOPTS=50;
   int optn=0;
   string *optlis=new string[MAXOPTS];
@@ -250,12 +250,17 @@ void JCfgRun::LoadFile(string fname,int lv){
         if(optn<MAXOPTS)optlis[optn]=tex;
         optn++;
       }
+      //printf("FF[%s]\n",tex.c_str());
     } 
     if(!pf.eof()&&pf.fail())RunException(met,"Error reading data from the file.",fname);
     pf.close();
   }
   else RunException(met,"The file can not be opened.",fname);
-  if(optn>=MAXOPTS)RunException(met,fun::PrintStr("File with too many lines (Maximum=%d)",MAXOPTS),fname);
+  if(optn>=MAXOPTS){
+    char cad[128];
+    sprintf(cad,"File with too many lines (Maximum=%d)",MAXOPTS);
+    RunException(met,cad,fname);
+  }
   if(optn>0)LoadOpts(optlis,optn,lv,fname);
   delete[] optlis;
 }
@@ -265,8 +270,10 @@ void JCfgRun::LoadFile(string fname,int lv){
 //==============================================================================
 void JCfgRun::ErrorParm(const std::string &opt,int optc,int lv,const std::string &file)const{
   const char met[]="ErrorParm";
-  std::string tx=fun::PrintStr("Parameter \"%s\" unrecognised or invalid. ",opt.c_str());
-  tx=tx+fun::PrintStr("(Level cfg:%d, Parameter:%d)",lv,optc);
+  char cad[256];
+  std::string tx;
+  sprintf(cad,"Parameter \"%s\" unrecognised or invalid. ",opt.c_str());  tx=cad;
+  sprintf(cad,"(Level cfg:%d, Parameter:%d)",lv,optc);  tx=tx+cad;
   if(file!="")RunException(met,tx,file); else RunException(met,tx);
 }
 
@@ -307,38 +314,30 @@ void JCfgRun::LoadOpts(string *optlis,int optn,int lv,string file){
         if(txopt!="")GpuId=atoi(txopt.c_str()); 
       }
       else if(txword=="STABLE")Stable=(txopt!=""? atoi(txopt.c_str()): 1)!=0;
-      else if(txword=="POSDOUBLE"){
-        if(txopt=="0")PosDouble=0;
-        else if(txopt=="1")PosDouble=1;
-        else if(txopt=="2")PosDouble=2;
-        else ErrorParm(opt,c,lv,file);
-      }
 #ifdef _WITHOMP
       else if(txword=="OMPTHREADS"){ 
         OmpThreads=atoi(txopt.c_str()); if(OmpThreads<0)OmpThreads=0;
+        if(OmpThreads==1)OmpMode=OMPM_Single;
+        else if(OmpMode==OMPM_Single)OmpMode=OMPM_Dynamic;
       } 
+      else if(txword=="OMPDYNAMIC")OmpMode=OMPM_Dynamic;
+      else if(txword=="OMPSTATIC")OmpMode=OMPM_Static;
 #endif
-      else if(txword=="BLOCKSIZE"){
-        if(txopt=="0")BlockSizeMode=BSIZEMODE_Fixed;
-        else if(txopt=="1")BlockSizeMode=BSIZEMODE_Occupancy;
-        else if(txopt=="2")BlockSizeMode=BSIZEMODE_Empirical;
-        else ErrorParm(opt,c,lv,file);
+      else if(txword=="CELLORDER"){
+        bool ok=true;
+        if(!txopt.empty()){
+          txopt=StrUpper(txopt);
+          if(txopt=="XYZ")CellOrder=ORDER_XYZ;
+          else if(txopt=="XZY")CellOrder=ORDER_XZY;
+          else if(txopt=="YXZ")CellOrder=ORDER_YXZ;
+          else if(txopt=="YZX")CellOrder=ORDER_YZX;
+          else if(txopt=="ZXY")CellOrder=ORDER_ZXY;
+          else if(txopt=="ZYX")CellOrder=ORDER_ZYX;
+          else ok=false;
+        }
+        else ok=false;
+        if(!ok)ErrorParm(opt,c,lv,file);
       }
-      //else if(txword=="CELLORDER"){
-      //  bool ok=true;
-      //  if(!txopt.empty()){
-      //    txopt=StrUpper(txopt);
-      //    if(txopt=="XYZ")CellOrder=ORDER_XYZ;
-      //    else if(txopt=="XZY")CellOrder=ORDER_XZY;
-      //    else if(txopt=="YXZ")CellOrder=ORDER_YXZ;
-      //    else if(txopt=="YZX")CellOrder=ORDER_YZX;
-      //    else if(txopt=="ZXY")CellOrder=ORDER_ZXY;
-      //    else if(txopt=="ZYX")CellOrder=ORDER_ZYX;
-      //    else ok=false;
-      //  }
-      //  else ok=false;
-      //  if(!ok)ErrorParm(opt,c,lv,file);
-      //}
       else if(txword=="CELLMODE"){
         bool ok=true;
         if(!txopt.empty()){
@@ -358,46 +357,36 @@ void JCfgRun::LoadOpts(string *optlis,int optn,int lv,string file){
       else if(txword=="WENDLAND")TKernel=KERNEL_Wendland;
       else if(txword=="VISCOART"){ 
         Visco=float(atof(txopt.c_str())); 
-        if(Visco>10)ErrorParm(opt,c,lv,file);
+        if(Visco>1)ErrorParm(opt,c,lv,file);
         TVisco=VISCO_Artificial;
       }
-      else if(txword=="VISCOLAMSPS"){ 
+      else if(txword=="VISCOLAMSPS"){    
         Visco=float(atof(txopt.c_str())); 
         if(Visco>0.001)ErrorParm(opt,c,lv,file);
-        TVisco=VISCO_LaminarSPS;
+        TVisco=VISCO_LaminarSPS; 
       }
-      else if(txword=="VISCOBOUNDFACTOR"){ 
-        ViscoBoundFactor=float(atof(txopt.c_str())); 
-        if(ViscoBoundFactor<0)ErrorParm(opt,c,lv,file);
+      else if(txword=="SHEPARD"){
+        if(txopt!="")ShepardSteps=atoi(txopt.c_str()); 
+        if(ShepardSteps<0)ErrorParm(opt,c,lv,file);
       }
-      else if(txword=="DELTASPH"){
-        DeltaSph=float(atof(txopt.c_str())); 
-        if(DeltaSph<0||DeltaSph>1)ErrorParm(opt,c,lv,file);
-      }
-      else if(txword=="SHIFTING"){
-        const string tx=fun::StrUpper(txopt);
-        if(tx=="NONE")Shifting=0;
-        else if(tx=="NOBOUND")Shifting=1;
-        else if(tx=="NOFIXED")Shifting=2;
-        else if(tx=="FULL")Shifting=3;
-        else ErrorParm(opt,c,lv,file);
-      }
+      else if(txword=="DELTASPH")DeltaSph=float(atof(txopt.c_str())); 
       else if(txword=="SVRES")SvRes=(txopt!=""? atoi(txopt.c_str()): 1)!=0;
       else if(txword=="SVTIMERS")SvTimers=(txopt!=""? atoi(txopt.c_str()): 1)!=0;
       else if(txword=="SVDOMAINVTK")SvDomainVtk=(txopt!=""? atoi(txopt.c_str()): 1)!=0;
       else if(txword=="SV"){
         string txop=StrUpper(txopt);
         while(txop.length()>0){
+          //printf("txop:[%s]\n",txop.c_str());
           pos=int(txop.find(","));
           string op=(pos>=0? txop.substr(0,pos): txop);
           txop=(pos>=0? txop.substr(pos+1): "");
           if(op=="NONE"){ 
-            SvDef=true; Sv_Binx=false; Sv_Info=false; 
+            SvDef=true; Sv_Info=false; Sv_Binx=false;
             Sv_Csv=false; Sv_Vtk=false;
           }
           else if(op=="BINX"){    SvDef=true; Sv_Binx=true; }
-          else if(op=="INFO"){    SvDef=true; Sv_Info=true; }
           else if(op=="VTK"){     SvDef=true; Sv_Vtk=true; }
+          else if(op=="INFO"){    SvDef=true; Sv_Info=true; }
           else if(op=="CSV"){     SvDef=true; Sv_Csv=true; }
           else ErrorParm(opt,c,lv,file);
         }
@@ -433,25 +422,26 @@ void JCfgRun::LoadOpts(string *optlis,int optn,int lv,string file){
         if(TimePart<0)ErrorParm(opt,c,lv,file);
       }
       else if(txword=="DOMAIN_PARTICLES"){
-        LoadDouble6(txopt+":"+txopt2+":"+txopt3,0,DomainParticlesMin,DomainParticlesMax);
+        LoadFloat6(txopt+":"+txopt2+":"+txopt3,0,DomainParticlesMin,DomainParticlesMax);
         DomainMode=1;
       }
       else if(txword=="DOMAIN_PARTICLES_PRC"){
-        LoadDouble6(txopt+":"+txopt2+":"+txopt3,0,DomainParticlesPrcMin,DomainParticlesPrcMax);
+        LoadFloat6(txopt+":"+txopt2+":"+txopt3,0,DomainParticlesPrcMin,DomainParticlesPrcMax);
         DomainMode=1;
       }
       else if(txword=="DOMAIN_FIXED"){
-        LoadDouble6(txopt+":"+txopt2+":"+txopt3,0,DomainFixedMin,DomainFixedMax);
+        LoadFloat6(txopt+":"+txopt2+":"+txopt3,0,DomainFixedMin,DomainFixedMax);
         DomainMode=2;
       }
       else if(txword=="INCZ"){ 
-        double incz=atof(txopt.c_str()); 
+        float incz=float(atof(txopt.c_str())); 
         if(incz<0)ErrorParm(opt,c,lv,file);
         DomainMode=1;
-        DomainParticlesMin=DomainParticlesMax=TDouble3(0);
-        DomainParticlesPrcMin=DomainParticlesPrcMax=TDouble3(0);
+        DomainParticlesMin=DomainParticlesMax=TFloat3(0);
+        DomainParticlesPrcMin=DomainParticlesPrcMax=TFloat3(0);
         DomainParticlesPrcMax.z=incz;
       }
+      else if(txword=="PTXASFILE"&&c+1<optn){ PtxasFile=optlis[c+1]; c++; }
       else if(txword=="OPT"&&c+1<optn){ LoadFile(optlis[c+1],lv+1); c++; }
       else if(txword=="H"||txword=="HELP"||txword=="?")PrintInfo=true;
       else ErrorParm(opt,c,lv,file);
@@ -460,57 +450,22 @@ void JCfgRun::LoadOpts(string *optlis,int optn,int lv,string file){
 }
 
 //==============================================================================
-/// Load 1 value tdouble3 using command options.
+/// Load 2 values tfloat3 using command options.
 //==============================================================================
-void JCfgRun::LoadDouble3(std::string txopt,double def,tdouble3 &v1){
-  double values[3]={def,def,def};
-  string ttx=txopt;
-  for(int tc=0;ttx!=""&&tc<3;tc++){
-    int tpos=int(ttx.find(":"));
-    string ttxopt=(tpos>0? ttx.substr(0,tpos): ttx);
-    string ttxopt2;
-    if(tpos>0)ttxopt2=ttx.substr(tpos+1);
-    values[tc]=atof(ttxopt.c_str());
-    ttx=ttxopt2;
-  } 
-  v1=TDouble3(values[0],values[1],values[2]);
-}
-
-//==============================================================================
-/// Load 1 value tfloat3 using command options.
-//==============================================================================
-void JCfgRun::LoadFloat3(std::string txopt,float def,tfloat3 &v1){
-  tdouble3 v1d;
-  LoadDouble3(txopt,def,v1d);
-  v1=ToTFloat3(v1d);
-}
-
-//==============================================================================
-/// Load 2 values tdouble3 using command options.
-//==============================================================================
-void JCfgRun::LoadDouble6(std::string txopt,double def,tdouble3 &v1,tdouble3 &v2){
-  double values[6]={def,def,def,def,def,def};
+void JCfgRun::LoadFloat6(std::string txopt,float def,tfloat3 &v1,tfloat3 &v2){
+  //printf("txopt=[%s]\n",txopt.c_str());
+  float values[6]={def,def,def,def,def,def};
   string ttx=txopt;
   for(int tc=0;ttx!=""&&tc<6;tc++){
     int tpos=int(ttx.find(":"));
     string ttxopt=(tpos>0? ttx.substr(0,tpos): ttx);
     string ttxopt2;
     if(tpos>0)ttxopt2=ttx.substr(tpos+1);
-    values[tc]=atof(ttxopt.c_str());
+    values[tc]=float(atof(ttxopt.c_str()));
     ttx=ttxopt2;
   } 
-  v1=TDouble3(values[0],values[1],values[2]);
-  v2=TDouble3(values[3],values[4],values[5]);
-}
-
-//==============================================================================
-/// Load 2 values tfloat3 using command options.
-//==============================================================================
-void JCfgRun::LoadFloat6(std::string txopt,float def,tfloat3 &v1,tfloat3 &v2){
-  tdouble3 v1d,v2d;
-  LoadDouble6(txopt,def,v1d,v2d);
-  v1=ToTFloat3(v1d);
-  v2=ToTFloat3(v2d);
+  v1=TFloat3(values[0],values[1],values[2]);
+  v2=TFloat3(values[3],values[4],values[5]);
 }
 
 

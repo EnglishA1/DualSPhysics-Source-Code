@@ -1,43 +1,49 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file JSphGpuSingle.cpp \brief Implements the class \ref JSphGpuSingle.
 
 #include "JSphGpuSingle.h"
-#include "JCellDivGpuSingle.h"
-#include "JArraysGpu.h"
-#include "Functions.h"
-#include "JXml.h"
-#include "JSphMotion.h"
-#include "JPartsLoad4.h"
-#include "JSphVisco.h"
-#include "JWaveGen.h"
-#include "JTimeOut.h"
 #include "JSphGpu_ker.h"
-#include "JBlockSizeAuto.h"
+
+//#include "GMultiGpu_ker.h"
+
+#include "Functions.h"
+#include "JSphMotion.h"
+#include "JCellDivGpuSingle.h"
+#include "JPtxasInfo.h"
+#include "JGpuArrays.h"
+#include "JPartsOut.h"
+#include "JPartsLoad.h"
+#include "JPeriodicGpu.h"
+
+#include "JPartsLoad4.h"
 
 using namespace std;
 //==============================================================================
 /// Constructor.
 //==============================================================================
-JSphGpuSingle::JSphGpuSingle():JSphGpu(false){
+JSphGpuSingle::JSphGpuSingle(){
   ClassName="JSphGpuSingle";
   CellDivSingle=NULL;
   PartsLoaded=NULL;
+  PartsLoaded4=NULL;
+  PeriZone=NULL;
 }
 
 //==============================================================================
@@ -46,389 +52,489 @@ JSphGpuSingle::JSphGpuSingle():JSphGpu(false){
 JSphGpuSingle::~JSphGpuSingle(){
   delete CellDivSingle; CellDivSingle=NULL;
   delete PartsLoaded;   PartsLoaded=NULL;
+  delete PartsLoaded4;   PartsLoaded4=NULL;
+  delete PeriZone;      PeriZone=NULL;
 }
 
 //==============================================================================
-/// Devuelve la memoria reservada en cpu.
-/// Returns the memory allocated to the CPU.
+/// Returns the allocated memory in CPU.
 //==============================================================================
-llong JSphGpuSingle::GetAllocMemoryCpu()const{  
-  llong s=JSphGpu::GetAllocMemoryCpu();
-  //Reservada en otros objetos
-  //Allocated in other objects
+long long JSphGpuSingle::GetAllocMemoryCpu()const{  
+  long long s=JSphGpu::GetAllocMemoryCpu();
+  //-Allocated in other objects.
   if(CellDivSingle)s+=CellDivSingle->GetAllocMemoryCpu();
   if(PartsLoaded)s+=PartsLoaded->GetAllocMemory();
+
+  //if(PartsLoaded4)s+=PartsLoaded4->GetAllocMemory();
+
   return(s);
 }
 
 //==============================================================================
-/// Devuelve la memoria reservada en gpu.
-/// Returns the memory allocated to the GPU.
+/// Returns the allocated memory in GPU.
 //==============================================================================
-llong JSphGpuSingle::GetAllocMemoryGpu()const{  
-  llong s=JSphGpu::GetAllocMemoryGpu();
-  //Reservada en otros objetos
-  //Allocated in other objects.
+long long JSphGpuSingle::GetAllocMemoryGpu()const{  
+  long long s=JSphGpu::GetAllocMemoryGpu();
+  //-Allocated in other objects.
   if(CellDivSingle)s+=CellDivSingle->GetAllocMemoryGpu();
+  if(PeriZone)s+=PeriZone->GetAllocMemoryGpu();
   return(s);
 }
 
 //==============================================================================
-/// Devuelve la memoria gpu reservada o usada para particulas.
-/// Returns the gpu memory allocated or used for particles
+/// Returns the GPU memory allocated or used for particles.
 //==============================================================================
-llong JSphGpuSingle::GetMemoryGpuNp()const{
-  llong s=JSphGpu::GetAllocMemoryGpu();
-  //Reservada en otros objetos
-  //Allocated in other objects
+long long JSphGpuSingle::GetMemoryGpuNp()const{
+  long long s=JSphGpu::GetAllocMemoryGpu();
+  //-Allocated in other objects.
   if(CellDivSingle)s+=CellDivSingle->GetAllocMemoryGpuNp();
+  if(PeriZone)s+=PeriZone->GetAllocMemoryGpuNp();
   return(s);
 }
 
 //==============================================================================
-/// Devuelve la memoria gpu reservada o usada para celdas.
-/// Returns the gpu memory allocated or used for cells.
+/// Returns the GPU memory allocated or used for cells.
 //==============================================================================
-llong JSphGpuSingle::GetMemoryGpuNct()const{
-  llong s=CellDivSingle->GetAllocMemoryGpuNct();
+long long JSphGpuSingle::GetMemoryGpuNct()const{
+  long long s=CellDivSingle->GetAllocMemoryGpuNct();
+  if(PeriZone)s+=PeriZone->GetAllocMemoryGpuNct();
   return(CellDivSingle->GetAllocMemoryGpuNct());
 }
 
 //==============================================================================
-/// Actualiza los valores maximos de memory, particles y cells.
 /// Updates the maximum values of memory, particles and cells.
 //==============================================================================
 void JSphGpuSingle::UpdateMaxValues(){
   MaxParticles=max(MaxParticles,Np);
   if(CellDivSingle)MaxCells=max(MaxCells,CellDivSingle->GetNct());
-  llong m=GetAllocMemoryCpu();
+  long long m=GetAllocMemoryCpu();
   MaxMemoryCpu=max(MaxMemoryCpu,m);
   m=GetAllocMemoryGpu();
   MaxMemoryGpu=max(MaxMemoryGpu,m);
 }
 
 //==============================================================================
-/// Carga la configuracion de ejecucion.
 /// Loads the configuration of the execution.
 //==============================================================================
 void JSphGpuSingle::LoadConfig(JCfgRun *cfg){
-  const char met[]="LoadConfig";
-  //-Carga configuracion basica general
-  //-Loads general configuration
-  JSph::LoadConfig(cfg);
-  BlockSizeMode=cfg->BlockSizeMode;
-  //-Checks compatibility of selected options.
-  Log->Print("**Special case configuration is loaded");
+  PtxasFile=cfg->PtxasFile;
+  JSph::LoadConfig(cfg);     //-Loads general configuration.
 }
 
 //==============================================================================
-/// Carga particulas del caso a procesar.
-/// Loads particles of the case to be processed.
+/// Loads particles of the case to be processesed.
 //==============================================================================
 void JSphGpuSingle::LoadCaseParticles(){
   Log->Print("Loading initial state of particles...");
-  PartsLoaded=new JPartsLoad4;
-  PartsLoaded->LoadParticles(DirCase,CaseName,PartBegin,PartBeginDir);
-  PartsLoaded->CheckConfig(CaseNp,CaseNfixed,CaseNmoving,CaseNfloat,CaseNfluid,PeriX,PeriY,PeriZ);
-  Log->Printf("Loaded particles: %u",PartsLoaded->GetCount());
-  //-Recupera informacion de las particulas cargadas.
-  //-Retrieves information of the loaded particles
-  Simulate2D=PartsLoaded->GetSimulate2D();
-  if(Simulate2D&&PeriY)RunException("LoadCaseParticles","Cannot use periodic conditions in Y with 2D simulations");
-  CasePosMin=PartsLoaded->GetCasePosMin();
-  CasePosMax=PartsLoaded->GetCasePosMax();
+  
+  
+  PartsLoaded=new JPartsLoad;
+  PartsLoaded4=new JPartsLoad4;
+  
+  PartsLoaded4->LoadParticles4(DirCase,CaseName,PartBegin,PartBeginDir);
+  PartsLoaded4->CheckConfig4(CaseNp,CaseNfixed,CaseNmoving,CaseNfloat,CaseNfluid,PeriX,PeriY,PeriZ);
+  sprintf(Cad,"Loaded particles: %u ",PartsLoaded4->GetCount()); Log->Print(Cad);
+  SetOutInitialCount(PartsLoaded4->GetCount()-PartsLoaded->GetCountOk());
+  //-Recovers information of the loaded particles.
+  Simulate2D=PartsLoaded4->GetSimulate2D();
+  if(Simulate2D&&PeriY)RunException("LoadCaseParticles","Periodic conditions in Y with 2D simulations can not be used.");
+  
+  /*
+  //v3
+  const float bordermax=H*BORDER_MAP;
+  const float peribordermax=Dp/2.f;
+  const tfloat3 border=TFloat3((PeriX? peribordermax: bordermax),(PeriY? peribordermax: bordermax),(PeriZ? peribordermax: bordermax));
+  PartsLoaded->GetLimits(border,border,MapPosMin,MapPosMax);
+  if(!PartBegin||PartsLoaded->LoadPartBi2())ResizeMapLimits();
+  if(PartBegin)PartBeginTimeStep=PartsLoaded->GetPartBeginTimeStep();
+  sprintf(Cad,"MapPos=(%f,%f,%f)-(%f,%f,%f)",MapPosMin.x,MapPosMin.y,MapPosMin.z,MapPosMax.x,MapPosMax.y,MapPosMax.z); Log->Print(Cad);
+  Log->Print("**Initial state of particles is loaded");
+  */
+
+  //4
+  CasePosMin=PartsLoaded4->GetCasePosMin();
+  CasePosMax=PartsLoaded4->GetCasePosMax();
 
   //-Calcula limites reales de la simulacion.
   //-Computes the current limits of the simulation.
-  if(PartsLoaded->MapSizeLoaded())PartsLoaded->GetMapSize(MapRealPosMin,MapRealPosMax);
+  if(PartsLoaded4->MapSizeLoaded())PartsLoaded4->GetMapSize(MapRealPosMin,MapRealPosMax);
   else{
-    PartsLoaded->CalculeLimits(double(H)*BORDER_MAP,Dp/2.,PeriX,PeriY,PeriZ,MapRealPosMin,MapRealPosMax);
+    PartsLoaded4->CalculeLimits(double(H)*BORDER_MAP,Dp/2.,PeriX,PeriY,PeriZ,MapRealPosMin,MapRealPosMax);
     ResizeMapLimits();
   }
   if(PartBegin){
-    PartBeginTimeStep=PartsLoaded->GetPartBeginTimeStep();
-    PartBeginTotalNp=PartsLoaded->GetPartBeginTotalNp();
+    double(PartBeginTimeStep)=PartsLoaded4->GetPartBeginTimeStep();
+    PartBeginTotalNp=PartsLoaded4->GetPartBeginTotalNp();
   }
   Log->Print(string("MapRealPos(final)=")+fun::Double3gRangeStr(MapRealPosMin,MapRealPosMax));
-  MapRealSize=MapRealPosMax-MapRealPosMin;
-  Log->Print("**Initial state of particles is loaded");
 
-  //-Configura limites de ejes periodicos
-  //-Configures the limits of the periodic axis
-  if(PeriX)PeriXinc.x=-MapRealSize.x;
-  if(PeriY)PeriYinc.y=-MapRealSize.y;
-  if(PeriZ)PeriZinc.z=-MapRealSize.z;
-  //-Calcula limites de simulacion con bordes periodicos.
-  //-Computes the limits of simulations with periodic edges.
-  Map_PosMin=MapRealPosMin; Map_PosMax=MapRealPosMax;
-  float dosh=float(H*2);
-  if(PeriX){ Map_PosMin.x=Map_PosMin.x-dosh;  Map_PosMax.x=Map_PosMax.x+dosh; }
-  if(PeriY){ Map_PosMin.y=Map_PosMin.y-dosh;  Map_PosMax.y=Map_PosMax.y+dosh; }
-  if(PeriZ){ Map_PosMin.z=Map_PosMin.z-dosh;  Map_PosMax.z=Map_PosMax.z+dosh; }
-  Map_Size=Map_PosMax-Map_PosMin;
+  
+  MapRealSize=MapRealPosMax-MapRealPosMin;
+  MapPosMin=ToTFloat3(MapRealPosMin);
+  MapPosMax=ToTFloat3(MapRealPosMax);
+
+  Log->Print("**Initial state of particles is loaded");
+  
+
+  //-Configures limits of periodic axis.
+  if(PeriX)PeriXinc.x=MapPosMin.x-MapPosMax.x;
+  if(PeriY)PeriYinc.y=MapPosMin.y-MapPosMax.y;
+  if(PeriZ)PeriZinc.z=MapPosMin.z-MapPosMax.z;
 }
 
 //==============================================================================
-/// Configuracion del dominio actual.
 /// Configuration of the current domain.
 //==============================================================================
 void JSphGpuSingle::ConfigDomain(){
   const char* met="ConfigDomain";
-  //-Calcula numero de particulas.
-  //Computes the number of particles.
-  Np=PartsLoaded->GetCount(); Npb=CaseNpb; NpbOk=Npb;
-  //-Reserva memoria fija para moving y floating.
-  //-Allocates memory for arrays with fixed size (motion and floating bodies)
-  AllocGpuMemoryFixed();
-  //-Reserva memoria en Gpu para particulas.
-  //-Allocates GPU memory for particles.
-  AllocGpuMemoryParticles(Np,0);
-  //-Reserva memoria en Cpu.
-  //-Allocates memory on the CPU.
-  AllocCpuMemoryParticles(Np);
+  //-Allocates memory in CPU and locates particle data in the variables of the domain.
+  AllocCpuMemoryParticles(CaseNp);
+  if(CaseNp!=PartsLoaded4->GetCount())RunException(met,"The number of particles is invalid.");
 
-  //-Copia datos de particulas.
-  //-Copies particle data.
-  memcpy(AuxPos,PartsLoaded->GetPos(),sizeof(tdouble3)*Np);
-  memcpy(Idp,PartsLoaded->GetIdp(),sizeof(unsigned)*Np);
-  memcpy(Velrhop,PartsLoaded->GetVelRhop(),sizeof(tfloat4)*Np);
+  tdouble3 *auxpos=new tdouble3[CaseNp];
+  tfloat4  *Velrhop=new tfloat4[CaseNp];
+  memcpy(Idp,PartsLoaded4->GetIdp(),CaseNp*sizeof(unsigned));
+  memcpy(auxpos,PartsLoaded4->GetPos(),CaseNp*sizeof(tdouble3));
+  //memcpy(Pos,PartsLoaded->GetPos(),CaseNp*sizeof(tfloat3));
+  memcpy(Velrhop,PartsLoaded4->GetVelRhop(),sizeof(tfloat4)*CaseNp);
 
-  //-Calcula radio de floatings.
-  //-Computes radius of floating bodies.
-  if(CaseNfloat && PeriActive!=0 && !PartBegin)CalcFloatingRadius(Np,AuxPos,Idp);
+  //I had to do this, not very nice but it works, sory Jose!
+  for(unsigned p=0;p<CaseNp;p++){
+	  Pos[p]=ToTFloat3(auxpos[p]);
+      tfloat4 vr=Velrhop[p];
+      Vel[p]=TFloat3(vr.x,vr.y,vr.z);
+      Rhop[p]=vr.w;
+  }
+  delete[] auxpos;
+  delete[] Velrhop;
+  
+  //memcpy(Vel,PartsLoaded->GetVel(),CaseNp*sizeof(tfloat3));
+  //memcpy(Rhop,PartsLoaded->GetRhop(),CaseNp*sizeof(float));
 
-  //-Carga code de particulas.
-  //-Loads Code of the particles.
-  LoadCodeParticles(Np,Idp,Code);
+  /*//debug
+  std::ofstream outpart;
+  outpart.open ("test.txt");
+  for(unsigned p=0;p<CaseNp;p++){
+	//printf("Pos.x=%f Pos.z=%f \n",Pos[p].x,Pos[p].z);
+	outpart << auxpos[p].x <<"\t"<< auxpos[p].z << endl;
+  }
+  outpart.close(); */
 
-  //-Libera memoria de PartsLoaded.
+  memset(Press,0,CaseNp*sizeof(float));
+  memset(Vtau,0,CaseNp*sizeof(float));
+  memset(Idpm,0,CaseNp*sizeof(unsigned));
+  
+  //Log->Print("ConfigDomain");
+  //getchar();
+
+  //-Loads code of particles.
+  //LoadCodeParticles(CaseNp,PartsLoaded4->GetCountOut(),Idp,Code);
+  LoadCodeParticles(CaseNp,Idp,Code);
   //-Releases memory of PartsLoaded.
   delete PartsLoaded; PartsLoaded=NULL;
-  //-Aplica configuracion de CellOrder.
-  //-Applies configuration of CellOrder.
-  ConfigCellOrder(CellOrder,Np,AuxPos,Velrhop);
-
-  //-Configura division celdas.
-  //-Configure cell division.
-  ConfigCellDivision();
-  //-Establece dominio de simulacion local dentro de Map_Cells y calcula DomCellCode.
-  //-Sets local domain of the simulation within Map_Cells and computes DomCellCode.
-  SelecDomain(TUint3(0,0,0),Map_Cells);
-  //-Calcula celda inicial de particulas y comprueba si hay excluidas inesperadas.
-  //-Computes inital cell of the particles and checks if there are unexpected excluded particles
-  LoadDcellParticles(Np,Code,AuxPos,Dcell);
-
-  //-Sube datos de particulas a la GPU.
-  //-Uploads particle data on the GPU.
-  ReserveBasicArraysGpu();
-  for(unsigned p=0;p<Np;p++){ Posxy[p]=TDouble2(AuxPos[p].x,AuxPos[p].y); Posz[p]=AuxPos[p].z; }
-  ParticlesDataUp(Np);
-  //-Sube constantes a la GPU.
-  //-Uploads constants on the GPU.
-  ConstantDataUp();
-
-  //-Crea objeto para divide en Gpu y selecciona un cellmode valido.
-  //-Creates object for Celldiv on the GPU and selects a valid cellmode.
-  CellDivSingle=new JCellDivGpuSingle(Stable,FtCount!=0,PeriActive,CellOrder,CellMode,Scell,Map_PosMin,Map_PosMax,Map_Cells,CaseNbound,CaseNfixed,CaseNpb,Log,DirOut);
-  CellDivSingle->DefineDomain(DomCellCode,DomCelIni,DomCelFin,DomPosMin,DomPosMax);
-  ConfigCellDiv((JCellDivGpu*)CellDivSingle);
-
-  ConfigBlockSizes(false,PeriActive!=0);
-  ConfigSaveData(0,1,"");
-
-  //-Reordena particulas por celda.
-  //-Reorders particles according to cells
-  BoundChanged=true;
-  RunCellDivide(true);
-}
-
-//==============================================================================
-/// Redimensiona el espacio reservado para particulas en CPU y GPU midiendo el
-/// tiempo consumido con TMG_SuResizeNp. Al terminar actualiza el divide.
-///
-/// Resizes the allocated space for particles on the CPU and the GPU measuring
-/// the time spent with TMG_SuResizeNp. At the end updates the division.
-//==============================================================================
-void JSphGpuSingle::ResizeParticlesSize(unsigned newsize,float oversize,bool updatedivide){
-  TmgStart(Timers,TMG_SuResizeNp);
-  newsize+=(oversize>0? unsigned(oversize*newsize): 0);
-  FreeCpuMemoryParticles();
-  CellDivSingle->FreeMemoryGpu();
-  ResizeGpuMemoryParticles(newsize);
-  AllocCpuMemoryParticles(newsize);
-  TmgStop(Timers,TMG_SuResizeNp);
-  if(updatedivide)RunCellDivide(true);
-}
-
-//==============================================================================
-/// Crea particulas duplicadas de condiciones periodicas.
-/// Crea nuevas particulas periodicas y marca las viejas para ignorarlas.
-/// Las nuevas periodicas se situan a partir del Np de entrada, primero las NpbPer
-/// de contorno y despues las NpfPer fluidas. El Np de salida contiene tambien las
-/// nuevas periodicas.
-///
-/// Creates duplicate particles for periodic conditions
-/// Creates new periodic particles and marks the old ones to be ignored.
-/// The new particles are lccated from the value of Np, first the NpbPer
-/// for boundaries and then the NpfPer for the fluids. The Np output also contains 
-/// the new periodic particles.
-//==============================================================================
-void JSphGpuSingle::RunPeriodic(){
-  const char met[]="RunPeriodic";
-  TmgStart(Timers,TMG_SuPeriodic);
-  //-Guarda numero de periodicas actuales.
-  //-Stores the current number of periodic particles.
-  NpfPerM1=NpfPer;
-  NpbPerM1=NpbPer;
-  //-Marca periodicas actuales para ignorar.
-  //-Marks current periodic particles to be ignored.
-  cusph::PeriodicIgnore(Np,Codeg);
-  //-Crea las nuevas periodicas.
-  //-Creates new periodic particles.
-  const unsigned npb0=Npb;
-  const unsigned npf0=Np-Npb;
-  const unsigned np0=Np;
-  NpbPer=NpfPer=0;
-  BoundChanged=true;
-  for(unsigned ctype=0;ctype<2;ctype++){//-0:bound, 1:fluid+floating.
-    //-Calcula rango de particulas a examinar (bound o fluid).
-    //-Computes the particle range to be examined (bound and fluid).
-    const unsigned pini=(ctype? npb0: 0);
-    const unsigned num= (ctype? npf0: npb0);
-    //-Busca periodicas en cada eje (X, Y e Z).
-    //-Searches for periodic zones on each axis (X, Y and Z).
-    for(unsigned cper=0;cper<3;cper++)if((cper==0 && PeriActive&1) || (cper==1 && PeriActive&2) || (cper==2 && PeriActive&4)){
-      tdouble3 perinc=(cper==0? PeriXinc: (cper==1? PeriYinc: PeriZinc));
-      //-Primero busca en la lista de periodicas nuevas y despues en la lista inicial de particulas (necesario para periodicas en mas de un eje).
-      //-First searches in the list of new periodic particles and then in the initial particle list (necessary for periodic zones in more than one axis)
-      for(unsigned cblock=0;cblock<2;cblock++){//-0:periodicas nuevas, 1:particulas originales //-0:new periodic particles, 1:original periodic particles
-        const unsigned nper=(ctype? NpfPer: NpbPer); //-Numero de periodicas nuevas del tipo a procesar. //-number of new periodic particles for the type currently computed (bound or fluid) 
-        const unsigned pini2=(cblock? pini: Np-nper);
-        const unsigned num2= (cblock? num:  nper);
-        //-Repite la busqueda si la memoria disponible resulto insuficiente y hubo que aumentarla.
-        //-Repeats search if the available memory was insufficient and had to be increased.
-        bool run=true;
-        while(run && num2){
-          //-Reserva memoria para crear lista de particulas periodicas.
-          //-Allocates memory to create the periodic particle list.
-          unsigned* listpg=ArraysGpu->ReserveUint();
-          unsigned nmax=GpuParticlesSize-1; //-Numero maximo de particulas que caben en la lista. //-maximum number of particles that can be included in the list
-          //-Genera lista de nuevas periodicas.
-          //-Generates list of new periodic particles
-          if(Np>=0x80000000)RunException(met,"The number of particles is too big.");//-Pq el ultimo bit se usa para marcar el sentido en que se crea la nueva periodica. //-Because the last bit is used to mark the reason the new periodical is created
-          unsigned count=cusph::PeriodicMakeList(num2,pini2,Stable,nmax,Map_PosMin,Map_PosMax,perinc,Posxyg,Poszg,Codeg,listpg);
-          //-Redimensiona memoria para particulas si no hay espacio suficiente y repite el proceso de busqueda.
-          //-Resizes the memory size for the particles if there is not sufficient space and repeats the serach process.
-          if(count>nmax || count+Np>GpuParticlesSize){
-            ArraysGpu->Free(listpg); listpg=NULL;
-            TmgStop(Timers,TMG_SuPeriodic);
-            ResizeParticlesSize(Np+count,PERIODIC_OVERMEMORYNP,false);
-            TmgStart(Timers,TMG_SuPeriodic);
-          }
-          else{
-            run=false;
-            //-Crea nuevas particulas periodicas duplicando las particulas de la lista.
-            //-Create new periodic particles duplicating the particles from the list
-            if(TStep==STEP_Verlet)cusph::PeriodicDuplicateVerlet(count,Np,DomCells,perinc,listpg,Idpg,Codeg,Dcellg,Posxyg,Poszg,Velrhopg,SpsTaug,VelrhopM1g);
-            if(TStep==STEP_Symplectic){
-              if((PosxyPreg || PoszPreg || VelrhopPreg) && (!PosxyPreg || !PoszPreg || !VelrhopPreg))RunException(met,"Symplectic data is invalid.") ;
-              cusph::PeriodicDuplicateSymplectic(count,Np,DomCells,perinc,listpg,Idpg,Codeg,Dcellg,Posxyg,Poszg,Velrhopg,SpsTaug,PosxyPreg,PoszPreg,VelrhopPreg);
-            }
-            //-Libera lista y actualiza numero de particulas.
-            //-Releases memory and updates the particle number.
-            ArraysGpu->Free(listpg); listpg=NULL;
-            Np+=count;
-            //-Actualiza numero de periodicas nuevas.
-            //-Updated number of new periodic particles.
-            if(!ctype)NpbPer+=count;
-            else NpfPer+=count;
-          }
-        }
-      }
-    }
+  //-Computes number of particles.
+  Np=CaseNp; Npb=CaseNpb; NpbOk=Npb;
+  
+  //*******************************adjusts rhop and idm for multi*****************************
+  //-Looking fluid limits
+  float minx=Pos[Npb].x,miny=Pos[Npb].y,maxx=minx,maxy=miny;
+  //printf("\n minx=%f ,miny=%f ,maxx=%f ,maxy=%f \n",minx ,miny ,maxx ,maxy);
+  for(unsigned p=Npb;p<Np;p++){
+    const tfloat3 *ps=(Pos+p);
+	if(minx>ps->x)minx=ps->x;
+	if(miny>ps->y)miny=ps->y;
+	if(maxx<ps->x)maxx=ps->x;
+	if(maxy<ps->y)maxy=ps->y;
   }
-  TmgStop(Timers,TMG_SuPeriodic);
-  CheckCudaError(met,"Failed in creation of periodic particles.");
+
+  printf("Domainfluid:(%f,%f)-(%f,%f)  dp:%f\n",minx,miny,maxx,maxy,Dp);
+  const float ovdp=1/Dp;
+  const int ncx=int((maxx-minx)*ovdp)+2,ncy=int((maxy-miny)*ovdp)+2;
+  const int nc=ncx*ncy;
+  printf("Domainfluid> ncx:%d ncy:%d  nc:%d\n",ncx,ncy,nc);
+  float epsilon=Dp/10;
+  float mindomx=minx-epsilon,mindomy=miny-epsilon;
+  float sizedomx=(maxx-minx)+2*epsilon,sizedomy=(maxy-miny)+2*epsilon;
+  //-Calculate x-column of each particle and counted.
+  int* partrow=new int[Np];
+  int* inrow=new int[nc];
+  memset(inrow,0,sizeof(int)*nc);
+  int npin=0;
+  for(unsigned p=0;p<Np;p++){
+    float px=Pos[p].x,py=Pos[p].y;
+	float dx=px-minx+epsilon,dy=py-miny+epsilon;
+	if(px>mindomx&&py>mindomy&&dx<sizedomx&&dy<sizedomy){//In fluid domain.
+      unsigned cx=unsigned(dx*ovdp),cy=unsigned(dy*ovdp);
+	  int row=cy*ncx+cx;
+	  partrow[p]=row;
+	  inrow[row]++;
+	  npin++;
+	}
+	else partrow[p]=-1;
+  }
+
+  printf("npin:%d\n",npin);
+  //-Sets initial position of columns.
+  int* beginrow=new int[nc+1];
+  beginrow[0]=0;
+  for(int row=0;row<nc;row++){
+	beginrow[row+1]=beginrow[row]+inrow[row];
+	inrow[row]=0;
+  }
+
+  //-Place the position (Pos []) of particles in the column where it belongs.
+  unsigned* partpos=new unsigned[npin];
+  for(unsigned p=0;p<Np;p++){
+    int row=partrow[p];
+	if(row>=0){
+	  partpos[beginrow[row]+inrow[row]]=p;
+	  inrow[row]++;
+	}
+  }
+
+  //-Adjusts the density of fluid particles according to the above need.
+  int* nphasedeep=new int[Phases];
+  for(int row=0;row<nc;row++){
+    int ini=beginrow[row];
+    int fin=beginrow[row+1];
+	for(int c=ini;c<fin;c++)if(partpos[c]>=Npb){//-Calculate the particles of each type above it (only for fluid).
+      unsigned ppos=partpos[c];
+      float pz=Pos[ppos].z;
+	  //-Estimated maximum depth to the nearest boundary.
+      float maxz=FLT_MAX;
+	  for(int c2=ini;c2<fin;c2++)if(partpos[c2]<Npb){
+        unsigned ppos2=partpos[c2];
+        float pz2=Pos[ppos2].z;
+		if(pz<pz2&&pz2<maxz)maxz=pz2;
+	  }
+	  //-Calculate fluid particles over each type up to nearest boundary.
+	  memset(nphasedeep,0,sizeof(int)*Phases);
+	  for(int c2=ini;c2<fin;c2++)if(partpos[c2]>=Npb){
+        unsigned ppos2=partpos[c2];
+        float pz2=Pos[ppos2].z;
+		if(pz<pz2&&pz2<maxz){
+		  unsigned id2=Idp[ppos2];
+		  int cphase;
+		  for(cphase=0;cphase<int(Phases)&&(id2<PhaseCte[cphase].idbegin||id2>=PhaseCte[cphase].idbegin+PhaseCte[cphase].count);cphase++);	
+		  if(cphase>=int(Phases))RunException(met,"Fluid particle unrecognized.");
+		  nphasedeep[cphase]++;
+		}
+	  }
+	  //-Adjust according to the particle density to support.
+	  float sumrhop0=0;
+	  for(int cphase=0;cphase<int(Phases);cphase++)sumrhop0+=PhaseArray[cphase].rho_ph*nphasedeep[cphase]*Dp;
+	  unsigned id=Idp[ppos];
+	  int cphase;
+	  for(cphase=0;cphase<int(Phases)&&(id<PhaseCte[cphase].idbegin||id>=PhaseCte[cphase].idbegin+PhaseCte[cphase].count);cphase++);	
+	  Rhop[ppos]=PhaseArray[cphase].rho_ph* pow((1+sumrhop0/PhaseArray[cphase].b_ph),1/PhaseArray[cphase].Gamma_ph);
+	  Press[ppos]=PhaseArray[cphase].b_ph*(pow(Rhop[ppos]/PhaseArray[cphase].rho_ph,7)-1.f);
+	  Viscop[ppos]=PhaseCte[cphase].visco;
+	  Idpm[ppos]=cphase; //fluid idpm 0/1
+
+	}
+  }
+
+  //Boundary idpm set to min desnity for now which is the fluid usualy
+  float rhomin=FLT_MAX;
+  unsigned c;
+  for(unsigned cphase=0;cphase<int(Phases);cphase++) {
+	  rhomin=min(PhaseArray[cphase].rho_ph,rhomin);
+	  if (PhaseArray[cphase].rho_ph==rhomin)c=cphase;
+  }
+  //Boundaries are set according to the original DualSPH constants visco,rhop0 etc.
+  for(unsigned p=0;p<Npb;p++){
+	  Idpm[p]=c;
+	  Viscop[p]=Visco;
+	  Rhop[p]=Rhop0;
+	  Press[p]=0.0f;
+  }
+
+  //-Frees dynamic memory the calculation of depth
+  delete[] inrow;
+  delete[] beginrow;
+  delete[] partrow;
+  delete[] partpos;
+  delete[] nphasedeep;
+  //**********************************************************************
+  
+  //-Applies configuration of CellOrder.
+  ConfigCellOrder(CellOrder,Np,Pos,Vel);
+
+  //-Allocates memory in GPU and copies data to GPU.
+  AllocGpuMemoryParticles(Np,0);
+  ReserveBasicGpuArrays();
+  ParticlesDataUp(Np);
+
+  //-Creates object for CellDiv in GPU and selects a valid cellmode.
+  CellDivSingle=new JCellDivGpuSingle(Stable,Log,DirOut,PeriActive,TVisco==VISCO_LaminarSPS,!PeriActive,MapPosMin,MapPosMax,Dosh,CaseNbound,CaseNfixed,CaseNpb,CellOrder);
+  //-Selects a valid cellmode.
+  if(CellMode==CELLMODE_None)CellMode=(Simulate2D? CELLMODE_2H: CELLMODE_None);
+  CellDivSingle->ConfigInit(CellMode,CaseNp,CaseNpb,RhopOut,RhopOutMin,RhopOutMax);
+  CellMode=CellDivSingle->GetCellMode();
+  Hdiv=CellDivSingle->GetHdiv();
+  Scell=CellDivSingle->GetScell();
+  MapCells=CellDivSingle->GetMapCells();
+  MovLimit=Scell*0.9f;
+  Log->Print(fun::VarStr("CellMode",string(GetNameCellMode(CellMode))));
+  Log->Print(fun::VarStr("Hdiv",Hdiv));
+  Log->Print(string("MapCells=(")+fun::Uint3Str(OrderDecode(MapCells))+")");
+  SaveMapCellsVtk(Scell);
+  ConfigCellDiv((JCellDivGpu*)CellDivSingle);
+  ConfigBlockSizes(false,PeriActive!=0);
+  //-Initialises the use of periodic conditions.
+  if(PeriActive)PeriInit();
+  //-Reorders particles according to cells.
+
+  ConfigSaveData(0,1,"");
+  BoundChanged=true;
+  RunCellDivide(false);
 }
 
 //==============================================================================
-/// Ejecuta divide de particulas en celdas.
-/// Executes the division of particles in cells.
+/// Initialises the use of periodic conditions.
 //==============================================================================
-void JSphGpuSingle::RunCellDivide(bool updateperiodic){
-  const char met[]="RunCellDivide";
-  //-Crea nuevas particulas periodicas y marca las viejas para ignorarlas.
-  //-Creates new periodic particles and marks the old ones to be ignored.
-  if(updateperiodic && PeriActive)RunPeriodic();
+void JSphGpuSingle::PeriInit(){
+  PeriZone=new JPeriodicGpu(Stable,Log,DirOut,MapPosMin,MapPosMax,(JCellDivGpu*)CellDivSingle);
+  if(PeriX&&!PeriXY&&!PeriXZ)PeriZone->ConfigX(PeriXinc);
+  if(PeriY&&!PeriXY&&!PeriYZ)PeriZone->ConfigY(PeriYinc);
+  if(PeriZ&&!PeriXZ&&!PeriYZ)PeriZone->ConfigZ(PeriZinc);
+  if(PeriXY)PeriZone->ConfigXY();
+  if(PeriXZ)PeriZone->ConfigXZ();
+  if(PeriYZ)PeriZone->ConfigYZ();
+}
 
-  //-Inicia Divide.
+//==============================================================================
+/// Checks position of particles for periodic conditions.
+//==============================================================================
+void JSphGpuSingle::PeriCheckPosition(){
+  TmgStart(Timers,TMG_NlPeriCheck);
+  PeriZone->CheckPositionAll(BoundChanged,Posg);
+  TmgStop(Timers,TMG_NlPeriCheck);
+}
+
+//==============================================================================
+/// Configures execution mode in GPU.
+//==============================================================================
+void JSphGpuSingle::ConfigRunMode(const std::string &preinfo){
+  #ifndef WIN32
+    const int len=128; char hname[len];
+    gethostname(hname,len);
+    JSphGpu::ConfigRunMode(preinfo+", HostName:"+hname);
+  #else
+    JSphGpu::ConfigRunMode(preinfo);
+  #endif
+}
+
+//==============================================================================
+/// Executes CellDiv of particles in cells.
+//==============================================================================
+void JSphGpuSingle::RunCellDivide(bool symvars){
+  //-Checks positions of the particles in the periodic edges.
+  if(PeriActive)PeriCheckPosition();
   //-Initiates Divide.
-  CellDivSingle->Divide(Npb,Np-Npb-NpbPer-NpfPer,NpbPer,NpfPer,BoundChanged,Dcellg,Codeg,Timers,Posxyg,Poszg,Idpg);
-
-  //-Ordena datos de particulas
-  //-Sorts particle data
+  CellDivSingle->Divide(BoundChanged,Posg,Rhopg,Codeg,Timers);
+  //-Orders particle data.
   TmgStart(Timers,TMG_NlSortData);
   {
-    unsigned* idpg=ArraysGpu->ReserveUint();
-    word*     codeg=ArraysGpu->ReserveWord();
-    unsigned* dcellg=ArraysGpu->ReserveUint();
-    double2*  posxyg=ArraysGpu->ReserveDouble2();
-    double*   poszg=ArraysGpu->ReserveDouble();
-    float4*   velrhopg=ArraysGpu->ReserveFloat4();
-    CellDivSingle->SortBasicArrays(Idpg,Codeg,Dcellg,Posxyg,Poszg,Velrhopg,idpg,codeg,dcellg,posxyg,poszg,velrhopg);
-    swap(Idpg,idpg);           ArraysGpu->Free(idpg);
-    swap(Codeg,codeg);         ArraysGpu->Free(codeg);
-    swap(Dcellg,dcellg);       ArraysGpu->Free(dcellg);
-    swap(Posxyg,posxyg);       ArraysGpu->Free(posxyg);
-    swap(Poszg,poszg);         ArraysGpu->Free(poszg);
-    swap(Velrhopg,velrhopg);   ArraysGpu->Free(velrhopg);
-  }
+    unsigned* idpg=GpuArrays->ReserveUint();
+    word* codeg=GpuArrays->ReserveWord();
+    float3* posg=GpuArrays->ReserveFloat3();
+    float3* velg=GpuArrays->ReserveFloat3();
+    float* rhopg=GpuArrays->ReserveFloat();
+	//multi
+	float* pressg=GpuArrays->ReserveFloat();
+	float* viscopg=GpuArrays->ReserveFloat();
+	unsigned* idpmg=GpuArrays->ReserveUint();
+	//reorder
+	CellDivSingle->SortBasicArrays(Idpg,Posg,Velg,Rhopg,Codeg,Pressg,Viscopg,Idpmg,  idpg,posg,velg,rhopg,codeg,pressg,viscopg,idpmg);
+	//swap bak to arrays
+    swap(Idpg,idpg);     GpuArrays->Free(idpg);
+    swap(Codeg,codeg);   GpuArrays->Free(codeg);
+    swap(Posg,posg);     GpuArrays->Free(posg);
+    swap(Velg,velg);     GpuArrays->Free(velg);
+    swap(Rhopg,rhopg);   GpuArrays->Free(rhopg);
+	//multi
+	swap(Pressg,pressg);     GpuArrays->Free(pressg);
+	swap(Viscopg,viscopg);   GpuArrays->Free(viscopg);
+	swap(Idpmg,idpmg);       GpuArrays->Free(idpmg);
+
+  }    
   if(TStep==STEP_Verlet){
-    float4* velrhopg=ArraysGpu->ReserveFloat4();
-    CellDivSingle->SortDataArrays(VelrhopM1g,velrhopg);
-    swap(VelrhopM1g,velrhopg);   ArraysGpu->Free(velrhopg);
+    float* rhopg=GpuArrays->ReserveFloat();
+    float3* velg=GpuArrays->ReserveFloat3();
+    CellDivSingle->SortDataArrays(RhopM1g,VelM1g,rhopg,velg);
+    swap(RhopM1g,rhopg);    GpuArrays->Free(rhopg);
+    swap(VelM1g,velg);      GpuArrays->Free(velg);
   }
-  else if(TStep==STEP_Symplectic && (PosxyPreg || PoszPreg || VelrhopPreg)){//En realidad solo es necesario en el divide del corrector, no en el predictor??? //In reality, only necessary in the corrector not the predictor step?
-    if(!PosxyPreg || !PoszPreg || !VelrhopPreg)RunException(met,"Symplectic data is invalid.") ;
-    double2* posxyg=ArraysGpu->ReserveDouble2();
-    double* poszg=ArraysGpu->ReserveDouble();
-    float4* velrhopg=ArraysGpu->ReserveFloat4();
-    CellDivSingle->SortDataArrays(PosxyPreg,PoszPreg,VelrhopPreg,posxyg,poszg,velrhopg);
-    swap(PosxyPreg,posxyg);      ArraysGpu->Free(posxyg);
-    swap(PoszPreg,poszg);        ArraysGpu->Free(poszg);
-    swap(VelrhopPreg,velrhopg);  ArraysGpu->Free(velrhopg);
+  else if(TStep==STEP_Symplectic&&symvars){
+    float* rhopg=GpuArrays->ReserveFloat();
+    float3* posg=GpuArrays->ReserveFloat3();
+    float3* velg=GpuArrays->ReserveFloat3();
+    CellDivSingle->SortDataArrays(RhopPreg,PosPreg,VelPreg,rhopg,posg,velg);
+    swap(RhopPreg,rhopg);   GpuArrays->Free(rhopg);
+    swap(PosPreg,posg);     GpuArrays->Free(posg);
+    swap(VelPreg,velg);     GpuArrays->Free(velg);
   }
-  if(TVisco==VISCO_LaminarSPS){
-    tsymatrix3f *spstaug=ArraysGpu->ReserveSymatrix3f();
-    CellDivSingle->SortDataArrays(SpsTaug,spstaug);
-    swap(SpsTaug,spstaug);  ArraysGpu->Free(spstaug);
+  if(TVisco==VISCO_LaminarSPS){  
+    tsymatrix3f* taug=GpuArrays->ReserveSymatrix3f();
+    CellDivSingle->SortDataArrays(Taug,taug);
+    swap(Taug,taug);       GpuArrays->Free(taug);
   }
 
-  //-Recupera datos del divide.
-  //-Retrieves division data.
-  Np=CellDivSingle->GetNpFinal();
-  Npb=CellDivSingle->GetNpbFinal();
+  if(TVisco==VISCO_SumSPS){  
+    tsymatrix3f* taug=GpuArrays->ReserveSymatrix3f();
+    CellDivSingle->SortDataArrays(Taug,taug);
+    swap(Taug,taug);       GpuArrays->Free(taug);
+
+	tsymatrix3f* vtaug=GpuArrays->ReserveSymatrix3f();
+	CellDivSingle->SortDataArrays(Vtaug,vtaug);
+	swap(Vtaug,vtaug);       GpuArrays->Free(vtaug);
+
+  }
+
+
+  //-Recovers data of CellDiv and updates number of particles of each type.
+  Np=CellDivSingle->GetNp();
   NpbOk=Npb-CellDivSingle->GetNpbIgnore();
-  //-Recupera posiciones de floatings.
-  //-Retrieves positions of floating bodies.
-  if(CaseNfloat)cusph::CalcRidp(PeriActive!=0,Np-Npb,Npb,CaseNpb,CaseNpb+CaseNfloat,Codeg,Idpg,FtRidpg);
   TmgStop(Timers,TMG_NlSortData);
-
-  //-Gestion de particulas excluidas (contorno y fluid).
-  //-Manages excluded particles (boundary and fluid).
+  //-Manages excluded particles (bound and fluid).
   TmgStart(Timers,TMG_NlOutCheck);
   unsigned npout=CellDivSingle->GetNpOut();
   if(npout){
-    ParticlesDataDown(npout,Np,true,true,false);
-    CellDivSingle->CheckParticlesOut(npout,Idp,AuxPos,AuxRhop,Code);
-    AddParticlesOut(npout,Idp,AuxPos,AuxVel,AuxRhop,CellDivSingle->GetNpfOutRhop(),CellDivSingle->GetNpfOutMove());
+    ParticlesDataDown(npout,Np,true,true);
+    CellDivSingle->CheckParticlesOut(npout,Idp,Pos,Rhop,Code);
+    PartsOut->AddParticles(npout,Idp,Pos,Vel,Rhop,CellDivSingle->GetNpfOutRhop(),CellDivSingle->GetNpfOutMove());
   }
   TmgStop(Timers,TMG_NlOutCheck);
   BoundChanged=false;
 }
 
 //==============================================================================
-/// Interaccion para el calculo de fuerzas.
+/// Generates periodic zones and computes interaction.
+//==============================================================================
+void JSphGpuSingle::PeriInteraction(TpInter tinter){
+  const bool xsph=(tinter==INTER_Forces);
+  const unsigned bsfluid=(xsph? BlockSizes.forcesfluid_peri: BlockSizes.forcesfluidcorr_peri);
+  const unsigned bsbound=BlockSizes.forcesbound_peri;
+  const unsigned nzone=PeriZone->GetZonesCount();
+  for(unsigned c=0;c<nzone;c++){
+    TmgStart(Timers,TMG_NlPeriPrepare); 
+    PeriZone->PrepareForces(c,PosPresg,Codeg,VelRhopg,Idpg,Taug);
+    TmgStop(Timers,TMG_NlPeriPrepare);
+    TmgStart(Timers,TMG_CfPeriForces);
+    if(CaseNfloat){     //-Checks if there are floating particles in the periodic zone.
+      unsigned idfloat=cusph::FtFindFirstFloating(PeriZone->GetListNp(),PeriZone->GetListNpb(),PeriZone->GetList(),PeriZone->GetListFluidIni(),Codeg,Idpg);
+      if(idfloat!=UINT_MAX){
+        sprintf(Cad,"Particle id:%u (from a floating body) in Periodicity region.",idfloat);
+        RunException("PeriInteraction",Cad);
+      }
+    }
+    cusph::InteractionPeri_Forces(TDeltaSph,TKernel,TVisco,xsph,CellMode,bsbound,bsfluid,PeriZone->GetListNp(),PeriZone->GetListNpb(),PeriZone->GetList(),PeriZone->GetListBoundIni(),PeriZone->GetListFluidIni(),PeriZone->GetListCellPart(),PeriZone->GetNc1(),PeriZone->GetBoxFluid(),PeriZone->GetBeginEndCell(),PeriZone->GetPosPres(),PeriZone->GetVelRhop(),PeriZone->GetIdp(),PeriZone->GetTau(),PosPresg,VelRhopg,Idpg,Taug,ViscDtg,Arg,Aceg,VelXcorg,Csphg,Deltag,Simulate2D);
+    TmgStop(Timers,TMG_CfPeriForces);
+  }
+}
+
+//==============================================================================
 /// Interaction for force computation.
 //==============================================================================
 void JSphGpuSingle::Interaction_Forces(TpInter tinter){
@@ -436,150 +542,221 @@ void JSphGpuSingle::Interaction_Forces(TpInter tinter){
   PreInteraction_Forces(tinter);
   TmgStart(Timers,TMG_CfForces);
 
-  const bool lamsps=(TVisco==VISCO_LaminarSPS);
-  unsigned bsfluid=BlockSizes.forcesfluid;
-  unsigned bsbound=BlockSizes.forcesbound;
+  const bool xsph=(tinter==INTER_Forces);
+  const unsigned bsfluid=(xsph? BlockSizes.forcesfluid: BlockSizes.forcesfluidcorr);
+  const unsigned bsbound=BlockSizes.forcesbound;
+  
+  //CudaArrayPrintFloat(Np,Viscopg,Idpg);
+  //CudaArrayPrintFloat3(Np,Aceg);
+  //CudaArrayPrintFloat4(Np,);
+  //CudaArrayPrintTsym3f(Np,Vtaug);
 
-  if(BsAuto && !(Nstep%BsAuto->GetStepsInterval())){ //-Cada cierto numero de pasos.
-    cusph::Interaction_Forces(Psimple,TKernel,WithFloating,UseDEM,lamsps,TDeltaSph,CellMode,Visco*ViscoBoundFactor,Visco,bsbound,bsfluid,Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellg,Posxyg,Poszg,PsPospressg,Velrhopg,Codeg,Idpg,FtoMasspg,SpsTaug,SpsGradvelg,ViscDtg,Arg,Aceg,Deltag,TShifting,ShiftPosg,ShiftDetectg,Simulate2D,NULL,BsAuto);
-    PreInteractionVars_Forces(tinter,Np,Npb);
-    BsAuto->ProcessTimes(TimeStep,Nstep);
-    bsfluid=BlockSizes.forcesfluid=BsAuto->GetKernel(0)->GetOptimumBs();
-    bsbound=BlockSizes.forcesbound=BsAuto->GetKernel(1)->GetOptimumBs();
+  if(WithFloating)cusph::FtInteraction_Forces(TDeltaSph,TKernel,TVisco,xsph,CellMode,bsbound,bsfluid,Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetCellPart(),CellDivSingle->GetBeginCell(),PosPresg,VelRhopg,Idpg,Taug,Codeg,FtoMasspg,ViscDtg,Arg,Aceg,VelXcorg,Csphg,Deltag,Simulate2D);
+    
+  else if (Multiphase)cusph::MultiInteraction_Forces  (TDeltaSph,TKernel,TVisco,xsph,CellMode,bsbound,bsfluid,Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetCellPart(),CellDivSingle->GetBeginCell(),PosPresg,VelRhopg,Idpg,Taug,Vtaug,ViscDtg,Arg,Aceg,VelXcorg,Csphg,Deltag,Idpmg,Viscopg,CVg,Simulate2D);
+  
+  else            cusph::Interaction_Forces  (TDeltaSph,TKernel,TVisco,xsph,CellMode,bsbound,bsfluid,Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetCellPart(),CellDivSingle->GetBeginCell(),PosPresg,VelRhopg,Idpg,Taug,ViscDtg,Arg,Aceg,VelXcorg,Csphg,Deltag,Simulate2D);
+  
+  if(PeriActive){
+    TmgStop(Timers,TMG_CfForces);
+    PeriInteraction(tinter);
+    TmgStart(Timers,TMG_CfForces);
   }
-
-  //-Interaccion Fluid-Fluid/Bound & Bound-Fluid.
-  //-Interaction Fluid-Fluid/Bound & Bound-Fluid.
-  cusph::Interaction_Forces(Psimple,TKernel,WithFloating,UseDEM,lamsps,TDeltaSph,CellMode,Visco*ViscoBoundFactor,Visco,bsbound,bsfluid,Np,Npb,NpbOk,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellg,Posxyg,Poszg,PsPospressg,Velrhopg,Codeg,Idpg,FtoMasspg,SpsTaug,SpsGradvelg,ViscDtg,Arg,Aceg,Deltag,TShifting,ShiftPosg,ShiftDetectg,Simulate2D,NULL,NULL);
-
-  //-Interaccion DEM Floating-Bound & Floating-Floating //(DEM)
-  //-Interaction DEM Floating-Bound & Floating-Floating //(DEM)
-  if(UseDEM)cusph::Interaction_ForcesDem(Psimple,CellMode,BlockSizes.forcesdem,CaseNfloat,CellDivSingle->GetNcells(),CellDivSingle->GetBeginCell(),CellDivSingle->GetCellDomainMin(),Dcellg,FtRidpg,DemDatag,float(DemDtForce),Posxyg,Poszg,PsPospressg,Velrhopg,Codeg,Idpg,ViscDtg,Aceg,NULL);
-
-  //-Calculo de Tau para Laminar+SPS
-  //-Computes Tau for Laminar+SPS
-  if(lamsps)cusph::ComputeSpsTau(Np,Npb,SpsSmag,SpsBlin,Velrhopg,SpsGradvelg,SpsTaug);
-
-  //-Para simulaciones 2D anula siempre la 2º componente
-  //-For 2D simulations always overrides the 2nd component (Y axis)
-  if(Simulate2D)cusph::Resety(Np-Npb,Npb,Aceg);
-
-  if(Deltag)cusph::AddDelta(Np-Npb,Deltag+Npb,Arg+Npb);//-Añade correccion de Delta-SPH a Arg[]. //-Adds the Delta-SPH correction for the density
+  if(Deltag)cusph::AddDelta(Np-Npb,Deltag+Npb,Arg+Npb);    //-Applies Delta-SPH to Arg[].
   CheckCudaError(met,"Failed while executing kernels of interaction.");
+  
+  //only for single phase
+  if(TVisco==VISCO_LaminarSPS)cusph::SPSCalcTau(WithFloating,Np,Npb,SpsSmag,SpsBlin,Rhopg,Codeg,Csphg,Taug);  //(kinematic here dynamic in SUmVsic)
 
-  //-Calculates maximum value of ViscDt.
+  //Remove Ace for unyielded material
+  //if (Multiphase)cusph::YieldResetAce(Np,Npb,Vtaug,Viscopg,Aceg,Idpmg,Velg,Arg);
+  
+  //Debug
+  //CudaArrayPrintFloat(Np,Rhopg);
+
+  //Reduce for Cs, Forces and Visocity
   if(Np)ViscDtMax=cusph::ReduMaxFloat(Np,0,ViscDtg,CellDivSingle->GetAuxMem(cusph::ReduMaxFloatSize(Np)));
-  //-Calculates maximum value of Ace using ViscDtg like auxiliar memory.
-  AceMax=ComputeAceMax(ViscDtg); 
+  //forces
+  cusph::CalcFa2(Np,Aceg,ViscDtg);
+  ForceDtMax=cusph::ReduMaxFloat(Np,0,ViscDtg,CellDivSingle->GetAuxMem(cusph::ReduMaxFloatSize(Np)));
+  //viscous
+  for (unsigned c=0;c<Phases;c++)ViscoDtMax=max(PhaseCte[c].visco,ViscoDtMax);
+  ViscoDtMax=0.5f/ViscoDtMax*cusph::ReduMaxFloat(Np,0,Rhopg,CellDivSingle->GetAuxMem(cusph::ReduMaxFloatSize(Np))); // this is wrong, need to reduce rho, htaHBP but with an upper limit on HBP
 
   TmgStop(Timers,TMG_CfForces);
   CheckCudaError(met,"Failed in reduction of viscdt.");
+
+  //if(0){  //dbg
+  //  char cad[512];
+  //  float *arh=new float[Np];
+  //  float3 *aceh=new float3[Np];
+  //  float3 *vcorh=new float3[Np];
+  //  unsigned *idph=new unsigned[Np];
+  //  cudaMemcpy(arh,Arg,sizeof(float)*Np,cudaMemcpyDeviceToHost);
+  //  cudaMemcpy(aceh,Aceg,sizeof(float3)*Np,cudaMemcpyDeviceToHost);
+  //  cudaMemcpy(vcorh,VelXcorg,sizeof(float3)*Np,cudaMemcpyDeviceToHost);
+  //  cudaMemcpy(idph,Idpg,sizeof(unsigned)*Np,cudaMemcpyDeviceToHost);
+  //  for(unsigned p=0;p<Np;p++){
+  //    unsigned id=idph[p];
+  //    if(id==225||id==264){
+  //      sprintf(cad,"particle[%u]> idp:%u  ar:%f  ace:(%f,%f,%f)",p,idph[p],arh[p],aceh[p].x,aceh[p].y,aceh[p].z); Log->Print(cad);
+  //    }
+  //    //sprintf(cad,"particle[%u]> idp:%u  ar:%f  vcor:(%f,%f,%f)",p,idph[p],arh[p],vcorh[p].x,vcorh[p].y,vcorh[p].z); Log->Print(cad);
+  //  }
+  //  Log->Print(" ");
+  //  delete[] arh;
+  //  delete[] aceh;
+  //  delete[] vcorh;
+  //  delete[] idph;
+  //}
 }
 
 //==============================================================================
-/// Devuelve valor maximo de (ace.x^2 + ace.y^2 + ace.z^2) a partir de Acec[].
-/// Returns the maximum value of  (ace.x^2 + ace.y^2 + ace.z^2) from Acec[].
+/// Computation of the step: Particle interaction and update of particle data
+/// according to the forces computed in the interaction using VERLET.
 //==============================================================================
-double JSphGpuSingle::ComputeAceMax(float *auxmem){
-  float acemax=0;
-  const unsigned npf=Np-Npb;
-  if(!PeriActive)cusph::ComputeAceMod(npf,Aceg+Npb,auxmem);//-Sin condiciones periodicas. //-Without periodic conditions.
-  else cusph::ComputeAceMod(npf,Codeg+Npb,Aceg+Npb,auxmem);//-Con condiciones periodicas ignora las particulas periodicas. //-With periodic conditions ignores the periodic particles.
-  if(npf)acemax=cusph::ReduMaxFloat(npf,0,auxmem,CellDivSingle->GetAuxMem(cusph::ReduMaxFloatSize(npf)));
-  return(sqrt(double(acemax)));
-}
-
-//==============================================================================
-/// Realiza interaccion y actualizacion de particulas segun las fuerzas 
-/// calculadas en la interaccion usando Verlet.
-///
-/// Particle interaction and update of particle data according to
-/// the computed forces using the Verlet time stepping scheme
-//==============================================================================
-double JSphGpuSingle::ComputeStep_Ver(){
-  Interaction_Forces(INTER_Forces);     //-Interaccion //-Interaction
-  const double dt=DtVariable(true);     //-Calcula nuevo dt //-Calculate new dt
-  DemDtForce=dt;                        //(DEM)
-  if(TShifting)RunShifting(dt);         //-Shifting
-  ComputeVerlet(dt);                    //-Actualiza particulas usando Verlet //-Update particle data using Verlet
-  if(CaseNfloat)RunFloating(dt,false); //-Gestion de floating bodies //-Management of floating bodies
-  PosInteraction_Forces();              //-Libera memoria de interaccion //-Releases memory of interaction
+float JSphGpuSingle::ComputeStep_Ver(bool rhopbound){
+  Interaction_Forces(INTER_Forces);    //-Interaction.
+  const float dt=DtVariable();         //-Computes new dt.
+  ComputeVerlet(rhopbound,dt);         //-Updates particles using Verlet.
+  if(CaseNfloat)RunFloating(dt,false); //-Processes floating bodies.
+  PosInteraction_Forces();             //-Releases memory of interaction.
   return(dt);
 }
 
 //==============================================================================
-/// Realiza interaccion y actualizacion de particulas segun las fuerzas 
-/// calculadas en la interaccion usando Symplectic.
-///
-/// Particle interaction and update of particle data according to
-/// the computed forces using the Symplectic time stepping scheme
+/// Computation of the step: Particle interaction and update of particle data
+/// according to the forces computed in the interaction using SYMPLECTIC.
 //==============================================================================
-double JSphGpuSingle::ComputeStep_Sym(){
-  const double dt=DtPre;
-  //-Predictor
+float JSphGpuSingle::ComputeStep_Sym(bool rhopbound){
+  const float dt=DtPre;
+  //-Predictor.
   //-----------
-  DemDtForce=dt*0.5f;                     //(DEM)
-  Interaction_Forces(INTER_Forces);       //-Interaccion //-Interaction
-  const double ddt_p=DtVariable(false);   //-Calcula dt del predictor //-Computes dt in the predictor step
-  if(TShifting)RunShifting(dt*.5);        //-Shifting
-  ComputeSymplecticPre(dt);               //-Aplica Symplectic-Predictor a las particulas //Applies Symplectic-Predictor to the particles
-  if(CaseNfloat)RunFloating(dt*.5,true);  //-Gestion de floating bodies //-Management of the floating bodies
-  PosInteraction_Forces();                //-Libera memoria de interaccion //-Releases memory of the interaction
-  //-Corrector
+  Interaction_Forces(INTER_Forces);         //-Interaction.
+  const float ddt_p=DtVariable();           //-Computes dt of Predictor.
+  ComputeSymplecticPre(rhopbound,dt);       //-Applies Symplectic-Predictor to particle data.
+  if(CaseNfloat)RunFloating(dt*.5f,true);   //-Processes floating bodies.
+  PosInteraction_Forces();                  //-Releases memory of interaction.
+  //-Corrector.
   //-----------
-  DemDtForce=dt;                          //(DEM)
   RunCellDivide(true);
-  Interaction_Forces(INTER_ForcesCorr);   //-Interaccion //-interaction
-  const double ddt_c=DtVariable(true);    //-Calcula dt del corrector //Computes dt in the corrector step
-  if(TShifting)RunShifting(dt);           //-Shifting
-  ComputeSymplecticCorr(dt);              //-Aplica Symplectic-Corrector a las particulas //Applies Symplectic-Corrector to the particles
-  if(CaseNfloat)RunFloating(dt,false);    //-Gestion de floating bodies //-Management of the floating bodies
-  PosInteraction_Forces();                //-Libera memoria de interaccion //-Releases memory of the interaction
+  Interaction_Forces(INTER_ForcesCorr);     //-Interaction without VelXCor[].
+  const float ddt_c=DtVariable();           //-Computes dt of Corrector.
+  ComputeSymplecticCorr(rhopbound,dt);      //-Applies Symplectic-Corrector to particle data.
+  if(CaseNfloat)RunFloating(dt,false);      //-Processes floating bodies.
+  PosInteraction_Forces();                  //-Releases memory of interaction.
 
-  DtPre=min(ddt_p,ddt_c);                 //-Calcula el dt para el siguiente ComputeStep //-Computes dt for the next ComputeStep
+  DtPre=min(ddt_p,ddt_c);                   //-Computes dt for the following ComputeStep.
   return(dt);
 }
 
 //==============================================================================
-/// Procesa floating objects.
-/// Processes floating objects.
+/// Processes floating bodies.
 //==============================================================================
-void JSphGpuSingle::RunFloating(double dt,bool predictor){
-  const char met[]="RunFloating";
-  if(TimeStep>=FtPause){//-Se usa >= pq si FtPause es cero en symplectic-predictor no entraria. //-Used because if FtPause is zero we don't enter the predictor.
+void JSphGpuSingle::RunFloating(float dt2,bool predictor){
+  if(TimeStep>FtPause){
     TmgStart(Timers,TMG_SuFloating);
-    //-Calcula fuerzas sobre floatings.
-    //-Computes forces for the floating objects
-    cusph::FtCalcForces(PeriActive!=0,FtCount,Gravity,FtoDatag,FtoMasspg,FtoCenterg,FtRidpg,Posxyg,Poszg,Aceg,FtoForcesg);
-    //-Aplica movimiento sobre floatings.
-    //-Applies movement to the floating objects
-    cusph::FtUpdate(PeriActive!=0,predictor,Simulate2D,FtCount,dt,Gravity,FtoDatag,FtRidpg,FtoForcesg,FtoCenterg,FtoVelg,FtoOmegag,Posxyg,Poszg,Dcellg,Velrhopg,Codeg);
+    cudaMemset(FtRidpg,255,sizeof(unsigned)*CaseNfloat); //-Assigns UINT_MAX values.
+    cusph::CalcRidp(Np-Npb,Npb,CaseNpb,CaseNpb+CaseNfloat,Idpg,FtRidpg);
+    for(unsigned cf=0;cf<FtCount;cf++){
+      StFloatingData *fobj=FtObjs+cf;
+      //-Computes traslational and rotational velocities.
+      tfloat3 face,fomegavel;
+      {
+        float3 *resultg=(float3 *)CellDivSingle->GetAuxMem(6);
+        cusph::FtCalcOmega(fobj->count,fobj->begin-CaseNpb,Gravity,fobj->mass,FtRidpg,FtDistg,Aceg,resultg);
+        tfloat3 result[2];
+        cudaMemcpy(&result,resultg,sizeof(float3)*2,cudaMemcpyDeviceToHost);
+        face=result[0];
+        fomegavel=result[1];
+      }
+      //sprintf(Cad,"%u>> face:%s fomegavel:%s",Nstep,fun::Float3Str(face).c_str(),fun::Float3Str(fomegavel).c_str()); Log->PrintDbg(Cad);
+      //-Recomputes values of floating.
+      tfloat3 center=fobj->center;
+      tfloat3 fvel=fobj->fvel;
+      tfloat3 fomega=fobj->fomega;
+      fomegavel.x/=fobj->inertia.x;
+      fomegavel.y/=fobj->inertia.y;
+      fomegavel.z/=fobj->inertia.z;    
+      center.x+=dt2*fvel.x;
+      center.y+=dt2*fvel.y;
+      center.z+=dt2*fvel.z;
+      fvel.x+=dt2*face.x;
+      fvel.y+=dt2*face.y;
+      fvel.z+=dt2*face.z;
+      fomega.x+=dt2*fomegavel.x;
+      fomega.y+=dt2*fomegavel.y;
+      fomega.z+=dt2*fomegavel.z;
+      //-Updates floating particles.
+      cusph::FtUpdate(predictor,fobj->count,fobj->begin-CaseNpb,dt2,center,fvel,fomega,FtRidpg,FtDistg,Posg,Velg);
+      //-Stores data.
+      if(!predictor){
+        fobj->center=center;
+        fobj->fvel=fvel;
+        fobj->fomega=fomega;
+      }
+    }
     TmgStop(Timers,TMG_SuFloating);
   }
 }
 
 //==============================================================================
-/// Inicia proceso de simulacion.
-/// Runs the simulation
+/// Generates periodic zones of interaction and computes Shepard interaction.
+//==============================================================================
+void JSphGpuSingle::PeriInteractionShepard(){
+  const unsigned bsshepard=BlockSizes.shepard_peri;
+  const unsigned nzone=PeriZone->GetZonesCount();
+  for(unsigned c=0;c<nzone;c++){
+    TmgStart(Timers,TMG_NlPeriPrepare); 
+    PeriZone->PrepareShepard(c,PosVolg,Codeg);
+    TmgStop(Timers,TMG_NlPeriPrepare);
+    TmgStart(Timers,TMG_CfPeriForces);
+    cusph::InteractionPeri_Shepard(TKernel,CellMode,bsshepard,PeriZone->GetListNp(),PeriZone->GetList(),PeriZone->GetListFluidIni(),PeriZone->GetListCellPart(),PeriZone->GetNc1(),PeriZone->GetBoxFluid(),PeriZone->GetBeginEndCell(),PeriZone->GetPosPres(),PosVolg,FdRhopg,FdWabg);
+    TmgStop(Timers,TMG_CfPeriForces);
+  }
+}
+
+//==============================================================================
+/// Applies Shepard density filter.
+//==============================================================================
+void JSphGpuSingle::RunShepard(){
+  TmgStart(Timers,TMG_CfShepard);
+  //-Preparares Shepard interaction.
+  PreInteraction_Shepard(!PeriActive);
+  //-Shepard interaction.
+  const unsigned bsshepard=BlockSizes.shepard;
+  cusph::Interaction_Shepard(TKernel,CellMode,bsshepard,Npb,Np,CellDivSingle->GetNcells(),CellDivSingle->GetCellPart(),CellDivSingle->GetBeginCell(),PosVolg,FdRhopg,FdWabg);
+  if(PeriActive){
+    TmgStop(Timers,TMG_CfShepard);
+    PeriInteractionShepard();
+    cusph::Compute_Shepard(Npb,Np,MassFluid,FdRhopg,FdWabg,Rhopg);   //-Computes new values of density in Rhopg[].
+    TmgStart(Timers,TMG_CfShepard);
+  }
+  else cudaMemcpy(Rhopg+Npb,FdRhopg+Npb,sizeof(float)*(Np-Npb),cudaMemcpyDeviceToDevice);//-Copies new values of density in Rhopg[].
+  //-Releases the assigned memory.
+  PosInteraction_Shepard();
+  CheckCudaError("RunShepard","Failed while executing Shepard filter.");
+  TmgStop(Timers,TMG_CfShepard);
+}
+
+//==============================================================================
+/// Runs the simulation.
 //==============================================================================
 void JSphGpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
   const char* met="Run";
   if(!cfg||!log)return;
   AppName=appname; Log=log;
 
-  //-Seleccion de GPU 
-  //-Selection of GPU
+  //-Selection of GPU.
   //-------------------
   SelecDevice(cfg->GpuId);
 
-  //-Configura timers 
-  //-Configures timers
+  //-Configures timers.
   //-------------------
   TmgCreation(Timers,cfg->SvTimers);
   TmgStart(Timers,TMG_Init);
 
-  //-Carga de parametros y datos de entrada
-  //-Loads parameters and input data
+  //-Loads parameters and input data.
   //-----------------------------------------
   LoadConfig(cfg);
   LoadCaseParticles();
@@ -587,19 +764,18 @@ void JSphGpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
   ConfigDomain();
   ConfigRunMode("Single-Gpu");
 
-  //-Inicializacion de variables de ejecucion
-  //-Initialisation of the execution variables
+  //-Initialisation of variables of execution.
   //-------------------------------------------
   InitRun();
   UpdateMaxValues();
   PrintAllocMemory(GetAllocMemoryCpu(),GetAllocMemoryGpu());
-  SaveData(); 
-  TmgResetValues(Timers);
   TmgStop(Timers,TMG_Init);
+  SaveData(); 
   PartNstep=-1; Part++;
+  //is it multiphase?
+  if (Phases>1)Multiphase=true;
 
-  //-Bucle principal
-  //-Main Loop
+  //-MAIN LOOP.
   //------------------
   bool partoutstop=false;
   TimerSim.Start();
@@ -607,14 +783,17 @@ void JSphGpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
   Log->Print(string("\n[Initialising simulation (")+RunCode+")  "+fun::GetDateTime()+"]");
   PrintHeadPart();
   while(TimeStep<TimeMax){
-    if(ViscoTime)Visco=ViscoTime->GetVisco(float(TimeStep));
-    double stepdt=ComputeStep();
+    float stepdt=ComputeStep(true);
     if(PartDtMin>stepdt)PartDtMin=stepdt; if(PartDtMax<stepdt)PartDtMax=stepdt;
     if(CaseNmoving)RunMotion(stepdt);
-    RunCellDivide(true);
+    RunCellDivide(false);
+    if(ShepardSteps&&Nstep&&( !((Nstep+1)%ShepardSteps) || (TStep==STEP_Verlet && !(Nstep%ShepardSteps)) ))RunShepard(); //-Shepard density filter.
+    //-Verlet+Shepard: Combining Shepar with Verlet, 
+    // Verlet must be applied in the corresponding step and also in the next one
+    // to smooth Rhop & RhopM1.
     TimeStep+=stepdt;
-    partoutstop=(Np<NpMinimum || !Np);
-    if(TimeStep>=TimePartNext || partoutstop){
+    partoutstop=unsigned(CaseNp-Np)>=PartOutMax;
+	if(TimeStep-TimePart*(Part-1)>=TimePart||SvSteps||partoutstop){
       if(partoutstop){
         Log->Print("\n**** Particles OUT limit reached...\n");
         TimeMax=TimeStep;
@@ -623,7 +802,6 @@ void JSphGpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
       Part++;
       PartNstep=Nstep;
       TimeStepM1=TimeStep;
-      TimePartNext=TimeOut->GetNextTime(TimeStep);
       TimerPart.Start();
     }
     UpdateMaxValues();
@@ -632,52 +810,50 @@ void JSphGpuSingle::Run(std::string appname,JCfgRun *cfg,JLog2 *log){
   }
   TimerSim.Stop(); TimerTot.Stop();
 
-  //-Fin de simulacion
-  //-End of the simulation.
+  //-End of simulation.
   //--------------------
   FinishRun(partoutstop);
 }
 
 //==============================================================================
-/// Genera los ficheros de salida de datos
-/// Generates output files for particle data
+/// Generates ouput files of particle data.
 //==============================================================================
 void JSphGpuSingle::SaveData(){
+  //v4 only
   const bool save=(SvData!=SDAT_None&&SvData!=SDAT_Info);
-  const unsigned npsave=Np-NpbPer-NpfPer; //-Resta las periodicas si las hubiera. //-Subtracts periodic particles if any.
-  //-Recupera datos de particulas en GPU.
-  //-Retrieves particle data from the GPU.
+  const unsigned npsave=Np;//-NpbPer-NpfPer; //-Resta las periodicas si las hubiera. //-Subtracts periodic particles if any.
+  //-Recovers particle data from GPU.
   if(save){
     TmgStart(Timers,TMG_SuDownData);
-    unsigned npnormal=ParticlesDataDown(Np,0,false,true,PeriActive!=0);
-    if(npnormal!=npsave)RunException("SaveData","The number of particles is invalid.");
+    ParticlesDataDown(Np,0,false,true);
     TmgStop(Timers,TMG_SuDownData);
   }
+
   //-Recupera datos de floatings en GPU.
   //-Retrieve floating object data from the GPU
   if(FtCount){
+	//disabled
     TmgStart(Timers,TMG_SuDownData);
-    cudaMemcpy(FtoCenter,FtoCenterg,sizeof(double3)*FtCount,cudaMemcpyDeviceToHost);
-    for(unsigned cf=0;cf<FtCount;cf++)FtObjs[cf].center=FtoCenter[cf];
-    tfloat3 *aux=(tfloat3 *)FtoCenter;
-    cudaMemcpy(aux,FtoVelg,sizeof(float3)*FtCount,cudaMemcpyDeviceToHost);
-    for(unsigned cf=0;cf<FtCount;cf++)FtObjs[cf].fvel=aux[cf];
-    cudaMemcpy(aux,FtoOmegag,sizeof(float3)*FtCount,cudaMemcpyDeviceToHost);
-    for(unsigned cf=0;cf<FtCount;cf++)FtObjs[cf].fomega=aux[cf];
+    //cudaMemcpy(FtoCenter,FtoCenterg,sizeof(double3)*FtCount,cudaMemcpyDeviceToHost);
+    //for(unsigned cf=0;cf<FtCount;cf++)FtObjs[cf].center=FtoCenter[cf];
+    //tfloat3 *aux=(tfloat3 *)FtoCenter;
+    //cudaMemcpy(aux,FtoVelg,sizeof(float3)*FtCount,cudaMemcpyDeviceToHost);
+    //for(unsigned cf=0;cf<FtCount;cf++)FtObjs[cf].fvel=aux[cf];
+    //cudaMemcpy(aux,FtoOmegag,sizeof(float3)*FtCount,cudaMemcpyDeviceToHost);
+    //for(unsigned cf=0;cf<FtCount;cf++)FtObjs[cf].fomega=aux[cf];
     TmgStop(Timers,TMG_SuDownData);
   }
-  //-Reune informacion adicional.
-  //-Collects additional information
-  TmgStart(Timers,TMG_SuSavePart);
+
+  PartsOut->Clear();
   StInfoPartPlus infoplus;
   memset(&infoplus,0,sizeof(StInfoPartPlus));
-  if(SvData&SDAT_Info){
+  if(SvData&SDAT_Info){ 
     infoplus.nct=CellDivSingle->GetNct();
     infoplus.npbin=NpbOk;
     infoplus.npbout=Npb-NpbOk;
     infoplus.npf=Np-Npb;
-    infoplus.npbper=NpbPer;
-    infoplus.npfper=NpfPer;
+    infoplus.npbper=0;//NpbPer;
+    infoplus.npfper=0;//NpfPer;
     infoplus.memorycpualloc=this->GetAllocMemoryCpu();
     infoplus.gpudata=true;
     infoplus.memorynctalloc=infoplus.memorynctused=GetMemoryGpuNct();
@@ -685,16 +861,16 @@ void JSphGpuSingle::SaveData(){
     TimerSim.Stop();
     infoplus.timesim=TimerSim.GetElapsedTimeD()/1000.;
   }
-  //-Graba datos de particulas.
-  //-Stores particle data.
-  const tdouble3 vdom[2]={OrderDecode(CellDivSingle->GetDomainLimits(true)),OrderDecode(CellDivSingle->GetDomainLimits(false))};
-  JSph::SaveData(npsave,Idp,AuxPos,AuxVel,AuxRhop,1,vdom,&infoplus);
-  TmgStop(Timers,TMG_SuSavePart);
+
+  const tdouble3 vdom[2]={ToTDouble3(OrderDecode(CellDivSingle->GetDomainLimits(true))),ToTDouble3(OrderDecode(CellDivSingle->GetDomainLimits(false)))};
+  JSph::SaveData(npsave,Idp,Pos,Vel,Rhop,Press,Viscop,Vtau,Idpm,1,vdom,&infoplus);
+
+
+  TmgStop(Timers,TMG_SuSavePart);   
 }
 
 //==============================================================================
-/// Muestra y graba resumen final de ejecucion.
-/// Displays and stores final summary of the execution.
+/// Displays and stores final brief of execution.
 //==============================================================================
 void JSphGpuSingle::FinishRun(bool stop){
   float tsim=TimerSim.GetElapsedTimeF()/1000.f,ttot=TimerTot.GetElapsedTimeF()/1000.f;
@@ -707,7 +883,5 @@ void JSphGpuSingle::FinishRun(bool stop){
   Log->Print(" ");
   if(SvRes)SaveRes(tsim,ttot,hinfo,dinfo);
 }
-
-
 
 

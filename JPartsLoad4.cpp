@@ -43,7 +43,7 @@ JPartsLoad4::~JPartsLoad4(){
 }
 
 //==============================================================================
-// Initialisation of variables.
+// Initialization of variables.
 //==============================================================================
 void JPartsLoad4::Reset(){
   Simulate2D=false;
@@ -118,7 +118,7 @@ void JPartsLoad4::SortParticles(){
 //==============================================================================
 // Carga particulas de fichero bi4 y las ordena por Id.
 //==============================================================================
-void JPartsLoad4::LoadParticles(const std::string &casedir,const std::string &casename,unsigned partbegin,const std::string &casedirbegin){
+void JPartsLoad4::LoadParticles4(const std::string &casedir,const std::string &casename,unsigned partbegin,const std::string &casedirbegin){
   const char met[]="LoadParticles";
   Reset();
   PartBegin=partbegin;
@@ -129,13 +129,13 @@ void JPartsLoad4::LoadParticles(const std::string &casedir,const std::string &ca
     const string file1=dir+JPartDataBi4::GetFileNameCase(casename,0,1);
     if(fun::FileExists(file1))pd.LoadFileCase(dir,casename,0,1);
     else if(fun::FileExists(dir+JPartDataBi4::GetFileNameCase(casename,0,2)))pd.LoadFileCase(dir,casename,0,2);
-    else RunException(met,"File of the particles was not found.",file1);
+    else RunException(met,"File of the particles was not found. 1",file1);
   }
   else{
     const string file1=dir+JPartDataBi4::GetFileNamePart(PartBegin,0,1);
     if(fun::FileExists(file1))pd.LoadFilePart(dir,PartBegin,0,1);
     else if(fun::FileExists(dir+JPartDataBi4::GetFileNamePart(PartBegin,0,2)))pd.LoadFilePart(dir,PartBegin,0,2);
-    else RunException(met,"File of the particles was not found.",file1);
+    else RunException(met,"File of the particles was not found. 2",file1);
   }
   //-Obtiene configuracion.
   PartBeginTimeStep=(!PartBegin? 0: pd.Get_TimeStep());
@@ -220,7 +220,7 @@ void JPartsLoad4::LoadParticles(const std::string &casedir,const std::string &ca
 //==============================================================================
 // Comprueba validez de la configuracion cargada o lanza excepcion.
 //==============================================================================
-void JPartsLoad4::CheckConfig(ullong casenp,ullong casenfixed,ullong casenmoving,ullong casenfloat,ullong casenfluid,bool perix,bool periy,bool periz)const
+void JPartsLoad4::CheckConfig4(ullong casenp,ullong casenfixed,ullong casenmoving,ullong casenfloat,ullong casenfluid,bool perix,bool periy,bool periz)const
 {
   const char met[]="CheckConfig";
   if(casenp!=CaseNp||casenfixed!=CaseNfixed||casenmoving!=CaseNmoving||casenfloat!=CaseNfloat||casenfluid!=CaseNfluid)RunException(met,"Data file does not match the configuration of the case.");

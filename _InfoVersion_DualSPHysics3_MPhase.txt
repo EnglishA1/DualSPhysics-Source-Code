@@ -1,0 +1,16 @@
+﻿[01-04-2015]
+  - Codigo multi-fase de Georgios. (01-04-2015)
+[15-09-2015]
+  - Se añadieron excepciones para opciones de ejecución no validas (CPU,Verlet,Cubic,Shepard,Visco). (15-09-2015)
+  - Se actualizo la cabecera con los nombres de los autores. (15-09-2015)
+  - Se ignora el ccodigo CPU y se deshabilito la compilacion con OpenMP. (15-09-2015)
+[22-09-2015]
+  - Cambio de nombre en algunos parametros del XML. (22-09-2015)
+[05-10-2015]
+  - Se arreglo el "bug" de la inicializacion de Cs0 (linea 651, ::ConfigConstants, JSph.cpp), debug/Release (05-10-2015) 
+
+
+
+
+
+

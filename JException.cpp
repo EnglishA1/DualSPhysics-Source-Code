@@ -1,24 +1,24 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file JException.cpp \brief Implements the class \ref JException.
 
 #include "JException.h"
-#include "Functions.h"
 #include <cstdio>
 
 //==============================================================================
@@ -41,9 +41,10 @@ JException::JException(const std::string &classname,const std::string &method,co
 //==============================================================================
 std::string JException::ToStr()const{
   std::string tx;
-  tx=fun::PrintStr("Exception (%s::%s)\n",ClassName.c_str(),Method.c_str());
-  if(!Text.empty())tx=tx+fun::PrintStr("Text: %s\n",Text.c_str());
-  if(!File.empty())tx=tx+fun::PrintStr("File: %s\n",File.c_str());
+  char cad[512];
+  sprintf(cad,"Exception (%s::%s)\n",ClassName.c_str(),Method.c_str());  tx=cad;
+  if(!Text.empty()){ sprintf(cad,"Text: %s\n",Text.c_str()); tx=tx+cad; }
+  if(!File.empty()){ sprintf(cad,"File: %s\n",File.c_str()); tx=tx+cad; }
   return(tx);
 }
 

@@ -1,18 +1,19 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file JSpaceEParms.cpp \brief Implements the class \ref JSpaceEParms.
@@ -27,33 +28,29 @@ JSpaceEParms::JSpaceEParms(){
   ClassName="JSpaceEParms";
   Reset();
 }
-
 //==============================================================================
 /// Destructor.
 //==============================================================================
 JSpaceEParms::~JSpaceEParms(){
   Reset();
 }
-
 //==============================================================================
 /// Initialisation of variables.
 //==============================================================================
 void JSpaceEParms::Reset(){
   List.clear();
 }
-
 //==============================================================================
 /// Adds element to the list.
 //==============================================================================
-void JSpaceEParms::Add(const std::string &key,const std::string &value,const std::string &comment,const std::string &unitscomment){
+void JSpaceEParms::Add(const std::string &key,const std::string &value,const std::string &comment){
   JSpaceEParmsItem* item=GetItemPointer(key);
-  if(item){ item->value=value; item->comment=comment; item->unitscomment=unitscomment; }
+  if(item){ item->value=value; item->comment=comment; }
   else{
-    JSpaceEParmsItem ite; ite.key=key; ite.value=value; ite.comment=comment; ite.unitscomment=unitscomment;
+    JSpaceEParmsItem ite; ite.key=key; ite.value=value; ite.comment=comment;
     List.push_back(ite);
   }
 }
-
 //==============================================================================
 /// Modifies the value of a pre-existing value.
 //==============================================================================
@@ -62,7 +59,6 @@ void JSpaceEParms::SetValue(const std::string &key,const std::string &value){
   if(!item)RunException("SetValue","The parameter to modify does not exist");
   item->value=value;
 }
-
 //==============================================================================
 /// Modifies the coment of a pre-existing value.
 //==============================================================================
@@ -102,9 +98,8 @@ std::string JSpaceEParms::GetValue(const std::string &key){
   return(value);
 }
 
-//==============================================================================
-/// Returns a given value associated to the requested key.
-//==============================================================================
+
+//=============================================================================
 int JSpaceEParms::GetValueNumInt(const std::string &key,int num,bool optional,int valdef){
   int ret=valdef;
   std::string txval=GetValueNum(key,num);
@@ -116,6 +111,7 @@ int JSpaceEParms::GetValueNumInt(const std::string &key,int num,bool optional,in
 double JSpaceEParms::GetValueNumDouble(const std::string &key,int num,bool optional,double valdef){
   double ret=valdef;
   std::string txval=GetValueNum(key,num);
+  //printf("---- key:[%s](%d)=[%s]\n",key.c_str(),num,txval.c_str());
   if(!txval.empty())ret=atof(txval.c_str());
   else if(!optional)RunException("GetValueNumDouble",std::string("The requested value \'")+key+"\' does not exist.");
   return(ret);
@@ -124,8 +120,18 @@ double JSpaceEParms::GetValueNumDouble(const std::string &key,int num,bool optio
 std::string JSpaceEParms::GetValueNumStr(const std::string &key,int num,bool optional,std::string valdef){
   std::string ret=valdef;
   std::string txval=GetValueNum(key,num);
+  //printf("---- key:[%s](%d)=[%s]\n",key.c_str(),num,txval.c_str());
   if(!txval.empty())ret=txval;
   else if(!optional)RunException("GetValueNumStr",std::string("The requested value \'")+key+"\' does not exist.");
+  return(ret);
+}
+//==============================================================================
+std::string JSpaceEParms::GetValueStr(const std::string &key,bool optional,std::string valdef){
+  std::string ret=valdef;
+  std::string txval=GetValue(key);
+  //printf("---- key:[%s](%d)=[%s]\n",key.c_str(),num,txval.c_str());
+  if(!txval.empty())ret=txval;
+  else if(!optional)RunException("GetValueStr",std::string("The requested value \'")+key+"\' does not exist.");
   return(ret);
 }
 
@@ -148,7 +154,6 @@ std::string JSpaceEParms::ToString(unsigned pos)const{
     while(tx.length()<30)tx=tx+" ";
     tx=tx+"#"+ite.comment;
   }
-  if(!ite.unitscomment.empty())tx=tx+" #"+ite.unitscomment;
   return(tx);
 }
 //==============================================================================
@@ -176,7 +181,6 @@ void JSpaceEParms::SaveFileXml(const std::string &file,const std::string &path,b
   SaveXml(&jxml,path);
   jxml.SaveFile(file);
 }
-
 //==============================================================================
 /// Loads initial conditions of XML object.
 //==============================================================================
@@ -186,7 +190,6 @@ void JSpaceEParms::LoadXml(JXml *sxml,const std::string &place){
   if(!node)RunException("LoadXml",std::string("Cannot find the element \'")+place+"\'.");
   ReadXml(sxml,node->ToElement());
 }
-
 //==============================================================================
 /// Stores initial conditions of XML object.
 //==============================================================================
@@ -200,7 +203,7 @@ void JSpaceEParms::SaveXml(JXml *sxml,const std::string &place)const{
 void JSpaceEParms::ReadXml(JXml *sxml,TiXmlElement* lis){
   TiXmlElement* ele=lis->FirstChildElement("parameter"); 
   while(ele){
-    Add(sxml->GetAttributeStr(ele,"key"),sxml->GetAttributeStr(ele,"value"),sxml->GetAttributeStr(ele,"comment",true),sxml->GetAttributeStr(ele,"units_comment",true));
+    Add(sxml->GetAttributeStr(ele,"key"),sxml->GetAttributeStr(ele,"value"),sxml->GetAttributeStr(ele,"comment",true));
     ele=ele->NextSiblingElement("parameter");
   }
 }
@@ -215,7 +218,6 @@ void JSpaceEParms::WriteXml(JXml *sxml,TiXmlElement* lis)const{
     JXml::AddAttribute(&item,"key",ite.key);
     JXml::AddAttribute(&item,"value",ite.value);
     if(!ite.comment.empty())JXml::AddAttribute(&item,"comment",ite.comment);
-    if(!ite.unitscomment.empty())JXml::AddAttribute(&item,"units_comment",ite.unitscomment);
     lis->InsertEndChild(item);
   }
 }

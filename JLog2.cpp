@@ -30,7 +30,7 @@ using std::endl;
 //==============================================================================
 /// Constructor.
 //==============================================================================
-JLog2::JLog2(TpMode_Out modeoutdef):ModeOutDef(modeoutdef){
+JLog2::JLog2(){
   ClassName="JLog2";
   Pf=NULL;
   Reset();
@@ -70,12 +70,10 @@ void JLog2::Init(std::string fname,bool mpirun,int mpirank,int mpilaunch){
     if(!ext.empty())fname=fname+"."+ext;
   }
   FileName=fname;
-  if(ModeOutDef&Out_File){
-    Pf=new ofstream; 
-    Pf->open(fname.c_str());
-    if(Pf)Ok=true;
-    else RunException("Init","Cannot open the file.",fname);
-  }
+  Pf=new ofstream; 
+  Pf->open(fname.c_str());
+  if(Pf)Ok=true;
+  else RunException("Init","Cannot open the file.",fname);
 }
 
 //==============================================================================
@@ -89,7 +87,6 @@ std::string JLog2::GetDirOut()const{
 /// Visualises and/or stores information of the execution.
 //==============================================================================
 void JLog2::Print(const std::string &tx,TpMode_Out mode,bool flush){
-  if(mode==Out_Default)mode=ModeOutDef;
   if(mode&Out_Screen){
     if(MpiRun){
       int pos=0;
@@ -98,7 +95,7 @@ void JLog2::Print(const std::string &tx,TpMode_Out mode,bool flush){
     }
     else printf("%s\n",tx.c_str());
   }
-  if((mode&Out_File) && Pf)(*Pf) << tx << endl;
+  if((mode&Out_File)&&Pf)(*Pf) << tx << endl;
   if(flush)fflush(stdout);
 }
   

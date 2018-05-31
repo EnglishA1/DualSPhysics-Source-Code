@@ -1,31 +1,28 @@
 /*
- <DUALSPHYSICS>  Copyright (c) 2016, Dr Jose M. Dominguez et al. (see http://dual.sphysics.org/index.php/developers/). 
+<DUALSPHYSICS>  Copyright (C) 2013 by Jose M. Dominguez, Dr Alejandro Crespo, Prof. M. Gomez Gesteira, Anxo Barreiro, Ricardo Canelas
+                                      Dr Benedict Rogers, Dr Stephen Longshaw, Dr Renato Vacondio
 
- EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
- School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
+EPHYSLAB Environmental Physics Laboratory, Universidade de Vigo, Ourense, Spain.
+School of Mechanical, Aerospace and Civil Engineering, University of Manchester, Manchester, U.K.
 
- This file is part of DualSPHysics. 
+This file is part of DualSPHysics. 
 
- DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
+DualSPHysics is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your option) any later version. 
 
- DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
+DualSPHysics is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 
- You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
 /// \file Functions.cpp \brief Implements basic/general functions for the entire application.
 
 #include "Functions.h"
-#include <limits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <stdarg.h>
-#include <algorithm>
-
-#pragma warning(disable : 4996) //Cancels sprintf() deprecated.
 
 namespace fun{
 
@@ -72,7 +69,7 @@ std::string GetTextRandomCode(unsigned length){
   code[length]=0;
   return(code);
 }
-  
+
 //==============================================================================
 /// Returns string using the same parameters used in printf().
 //==============================================================================
@@ -94,6 +91,7 @@ std::string PrintStr(const char *format,...){
   return(ret);
 }
 
+
 //==============================================================================
 /// Converts unsigned value to string filling with zeros.
 //==============================================================================
@@ -107,27 +105,18 @@ std::string IntStrFill(int v,int vmax){
 //==============================================================================
 /// Converts long long value to string.
 //==============================================================================
-std::string LongStr(llong v){
+std::string LongStr(long long v){
   char cad[128];
   sprintf(cad,"%lld",v);
   return(std::string(cad));
 }
 
 //==============================================================================
-/// Converts unsigned long long value to string.
-//==============================================================================
-std::string UlongStr(ullong v){
-  char cad[128];
-  sprintf(cad,"%llu",v);
-  return(std::string(cad));
-}
-
-//==============================================================================
 /// Converts unsigned value to string.
 //==============================================================================
-std::string UintStr(unsigned v,const char* fmt){
+std::string UintStr(unsigned v){
   char cad[128];
-  sprintf(cad,fmt,v);
+  sprintf(cad,"%u",v);
   return(std::string(cad));
 }
 
@@ -137,6 +126,16 @@ std::string UintStr(unsigned v,const char* fmt){
 std::string IntStr(int v){
   char cad[128];
   sprintf(cad,"%d",v);
+  return(std::string(cad));
+}
+
+
+//==============================================================================
+/// Converts unsigned long long value to string.
+//==============================================================================
+std::string UlongStr(ullong v){
+  char cad[128];
+  sprintf(cad,"%llu",v);
   return(std::string(cad));
 }
 
@@ -195,51 +194,6 @@ std::string Double3Str(const tdouble3 &v,const char* fmt){
 }
 
 //==============================================================================
-/// Converts real value to string.
-//==============================================================================
-std::string Double4Str(const tdouble4 &v,const char* fmt){
-  char cad[1024];
-  sprintf(cad,fmt,v.x,v.y,v.z,v.w);
-  return(std::string(cad));
-}
-
-//==============================================================================
-/// Converts string to int value.
-//==============================================================================
-int StrToInt(const std::string &v){
-  return(atoi(v.c_str()));
-}
-
-//==============================================================================
-/// Converts string to tint3 value.
-//==============================================================================
-tint3 StrToInt3(std::string v){
-  tint3 res=TInt3(0);
-  if(!v.empty())res.x=atoi(fun::StrSplit(",",v).c_str());
-  if(!v.empty())res.y=atoi(fun::StrSplit(",",v).c_str());
-  if(!v.empty())res.z=atoi(fun::StrSplit(",",v).c_str());
-  return(res);
-}
-
-//==============================================================================
-/// Converts string to double value.
-//==============================================================================
-double StrToDouble(const std::string &v){
-  return(atof(v.c_str()));
-}
-
-//==============================================================================
-/// Converts string to tdouble3 value.
-//==============================================================================
-tdouble3 StrToDouble3(std::string v){
-  tdouble3 res=TDouble3(0);
-  if(!v.empty())res.x=atof(fun::StrSplit(",",v).c_str());
-  if(!v.empty())res.y=atof(fun::StrSplit(",",v).c_str());
-  if(!v.empty())res.z=atof(fun::StrSplit(",",v).c_str());
-  return(res);
-}
-
-//==============================================================================
 /// Gets string in uppercase.
 //==============================================================================
 std::string StrUpper(const std::string &cad){
@@ -258,7 +212,7 @@ std::string StrLower(const std::string &cad){
 }
 
 //==============================================================================
-/// Gets string without spaces at the beginning and end.
+/// Gets string without spaces.
 //==============================================================================
 std::string StrTrim(const std::string &cad){
   std::string ret;
@@ -270,58 +224,14 @@ std::string StrTrim(const std::string &cad){
 }
 
 //==============================================================================
-/// Gets string without repeated spaces.
-//==============================================================================
-std::string StrTrimRepeated(const std::string &cad){
-  std::string ret;
-  bool lastsp=false;
-  for(int c=0;c<int(cad.length());c++){
-    const char let=cad[c];
-    if(!lastsp || let!=' '){
-      ret=ret+let;
-      lastsp=(let==' ');
-    }
-  }
-  return(ret);
-}
-
-//==============================================================================
-/// Gets string without the character indicated.
-//==============================================================================
-std::string StrWithoutChar(const std::string &cad,char let){
-  std::string ret;
-  for(int c=0;c<int(cad.length());c++)if(cad[c]!=let)ret=ret+cad[c];
-  return(ret);
-}
-
-//==============================================================================
-/// Gets string with the string indicated n times.
-//==============================================================================
-std::string StrRepeat(const std::string &cad,unsigned count){
-  std::string ret;
-  for(unsigned c=0;c<count;c++)ret=ret+cad;
-  return(ret);
-}
-
-//==============================================================================
-/// Inidicates if the string cad only contains characters in the string chars.
-//==============================================================================
-bool StrOnlyChars(const std::string &cad,const std::string &chars){
-  bool ok=true;
-  const unsigned nc=unsigned(chars.length());
-  for(int c=0;c<int(cad.length()) && ok;c++){
-    const char let=cad[c];
-    unsigned c2=0;
-    for(;c2<nc && chars[c2]!=let;c2++);
-    if(c2>=nc)ok=false;
-  }
-  return(ok);
-}
-
-//==============================================================================
-/// Returns the text untill the indicated mark and saves the rest in text format.
+/// Returns the text till the indicated mark and saves the rest in text format.
 //==============================================================================
 std::string StrSplit(const std::string mark,std::string &text){
+/* Old version
+  int tpos=int(text.find(mark));
+  std::string ret=(tpos>0? text.substr(0,tpos): text);
+  text=(tpos>0? text.substr(tpos+1): "");
+*/
   const unsigned smark=unsigned(mark.size());
   int tpos=int(text.find(mark));
   std::string ret=(tpos>=0? text.substr(0,tpos): text);
@@ -375,68 +285,6 @@ unsigned VectorSplitInt(const std::string mark,const std::string &text,std::vect
   return((unsigned)vec.size());
 }
 
-
-
-//==============================================================================
-/// Returns first double value after "pretex".
-//==============================================================================
-double GetFirstValueDouble(std::string tex,std::string pretex){
-  if(!pretex.empty()){//-Elimina texto previo si lo hubiera.
-    int pre=int(tex.find(pretex));
-    if(pre>=0)tex=tex.substr(pre);
-  }
-  int pini=int(strcspn(tex.c_str(),"0123456789-"));//-Localiza principio de numero.
-  tex=tex.substr(pini);
-  int len=int(strspn(tex.c_str(),"0123456789-."));//-Calcula longitud de numero.
-  return(atof(tex.substr(0,len).c_str()));
-}
-
-//==============================================================================
-/// Returns first double value after "pretex" and returns the remaining text.
-//==============================================================================
-double GetFirstValueDouble(std::string tex,std::string &endtex,std::string pretex){
-  if(!pretex.empty()){//-Elimina texto previo si lo hubiera.
-    int pre=int(tex.find(pretex));
-    if(pre>=0)tex=tex.substr(pre);
-  }
-  int pini=int(strcspn(tex.c_str(),"0123456789-"));//-Localiza principio de numero.
-  tex=tex.substr(pini);
-  int len=int(strspn(tex.c_str(),"0123456789-."));//-Calcula longitud de numero.
-  endtex=tex.substr(len);
-  return(atof(tex.substr(0,len).c_str()));
-}
-
-//==============================================================================
-/// Returns first int value after "pretex".
-//==============================================================================
-int GetFirstValueInt(std::string tex,std::string pretex){
-  if(!pretex.empty()){//-Elimina texto previo si lo hubiera.
-    int pre=int(tex.find(pretex));
-    if(pre>=0)tex=tex.substr(pre);
-  }
-  int pini=int(strcspn(tex.c_str(),"0123456789-"));//-Localiza principio de numero.
-  tex=tex.substr(pini);
-  int len=int(strspn(tex.c_str(),"0123456789-"));//-Calcula longitud de numero.
-  return(atoi(tex.substr(0,len).c_str()));
-}
-
-//==============================================================================
-/// Returns first int value after "pretex" and returns the remaining text.
-//==============================================================================
-int GetFirstValueInt(std::string tex,std::string &endtex,std::string pretex){
-  if(!pretex.empty()){//-Elimina texto previo si lo hubiera.
-    int pre=int(tex.find(pretex));
-    if(pre>=0)tex=tex.substr(pre);
-  }
-  int pini=int(strcspn(tex.c_str(),"0123456789-"));//-Localiza principio de numero.
-  tex=tex.substr(pini);
-  int len=int(strspn(tex.c_str(),"0123456789-"));//-Calcula longitud de numero.
-  endtex=tex.substr(len);
-  return(atoi(tex.substr(0,len).c_str()));
-}
-
-
-
 //==============================================================================
 /// Returns variable and its value in text format.
 //==============================================================================
@@ -457,29 +305,14 @@ std::string VarStr(const std::string &name,unsigned value){
   sprintf(cad,"=%u",value);
   return(name+cad);
 }
-std::string VarStr(const std::string &name,unsigned n,const int* values,std::string size){
-  std::string tex=name+"["+(size=="?"? UintStr(n): size)+"]=[";
-  for(unsigned c=0;c<n;c++)tex=tex+(c? ",": "")+fun::IntStr(values[c]);
+std::string VarStr(const std::string &name,int n,const int* values,std::string size){
+  std::string tex=name+"["+(size=="?"? IntStr(n): size)+"]=[";
+  for(int c=0;c<n;c++)tex=tex+(c? ",": "")+fun::IntStr(values[c]);
   return(tex+"]");
 }
-std::string VarStr(const std::string &name,unsigned n,const unsigned* values,std::string size){
-  std::string tex=name+"["+(size=="?"? UintStr(n): size)+"]=[";
-  for(unsigned c=0;c<n;c++)tex=tex+(c? ",": "")+fun::UintStr(values[c]);
-  return(tex+"]");
-}
-std::string VarStr(const std::string &name,unsigned n,const word* values,std::string size){
-  std::string tex=name+"["+(size=="?"? UintStr(n): size)+"]=[";
-  for(unsigned c=0;c<n;c++)tex=tex+(c? ",": "")+fun::UintStr(values[c]);
-  return(tex+"]");
-}
-std::string VarStr(const std::string &name,unsigned n,const float* values,std::string size,const char* fmt){
-  std::string tex=name+"["+(size=="?"? UintStr(n): size)+"]=[";
-  for(unsigned c=0;c<n;c++)tex=tex+(c? ",": "")+fun::FloatStr(values[c],fmt);
-  return(tex+"]");
-}
-std::string VarStr(const std::string &name,unsigned n,const double* values,std::string size,const char* fmt){
-  std::string tex=name+"["+(size=="?"? UintStr(n): size)+"]=[";
-  for(unsigned c=0;c<n;c++)tex=tex+(c? ",": "")+fun::DoubleStr(values[c],fmt);
+std::string VarStr(const std::string &name,int n,const float* values,std::string size,const char* fmt){
+  std::string tex=name+"["+(size=="?"? IntStr(n): size)+"]=[";
+  for(int c=0;c<n;c++)tex=tex+(c? ",": "")+fun::FloatStr(values[c],fmt);
   return(tex+"]");
 }
 
@@ -491,7 +324,6 @@ void PrintVar(const std::string &name,const std::string &value,const std::string
 void PrintVar(const std::string &name,float value,const std::string &post){ printf("%s%s",VarStr(name,value).c_str(),post.c_str()); }
 void PrintVar(const std::string &name,double value,const std::string &post){ printf("%s%s",VarStr(name,value).c_str(),post.c_str()); }
 void PrintVar(const std::string &name,tfloat3 value,const std::string &post){ printf("%s%s",VarStr(name,value).c_str(),post.c_str()); }
-void PrintVar(const std::string &name,tdouble3 value,const std::string &post){ printf("%s%s",VarStr(name,value).c_str(),post.c_str()); }
 void PrintVar(const std::string &name,bool value,const std::string &post){ printf("%s%s",VarStr(name,value).c_str(),post.c_str()); }
 void PrintVar(const std::string &name,int value,const std::string &post){ printf("%s%s",VarStr(name,value).c_str(),post.c_str()); }
 void PrintVar(const std::string &name,unsigned value,const std::string &post){ printf("%s%s",VarStr(name,value).c_str(),post.c_str()); }
@@ -566,6 +398,7 @@ std::string GetExtension(const std::string &file){
   int pos=(int)file.find_last_of(".");
   int posmin=std::max((int)file.find_last_of("/"),(int)file.find_last_of("\\"));
   if(pos>=0&&pos>posmin)ext=file.substr(pos+1);
+  //printf("[%s].[%s]\n",file.c_str(),ext.c_str());
   return(ext);
 }
 
@@ -680,7 +513,7 @@ TpByteOrder GetByteOrder(){
 //==============================================================================
 /// Reverses the order of the bytes to exchange BigEndian and LittleEndian.
 //==============================================================================
-void ReverseByteOrder(llong *data,int count,llong *result){
+void ReverseByteOrder(long long *data,int count,long long *result){
   for(int c=0;c<count;c++){
     unsigned int v=((unsigned int*)data)[c*2+1];
     unsigned int v2=((unsigned int*)data)[c*2];
@@ -704,6 +537,9 @@ void ReverseByteOrder(short *data,int count,short *result){
 }
 
 
+//##############################################################################
+//##############################################################################
+//##############################################################################
 //==============================================================================
 /// Resizes the allocated memory, keeping the data.
 //==============================================================================
@@ -711,14 +547,6 @@ byte* ResizeAlloc(byte *data,unsigned ndata,unsigned newsize){
   byte* data2=new byte[newsize];
   ndata=std::min(ndata,newsize);
   if(ndata)memcpy(data2,data,sizeof(byte)*ndata);
-  delete[] data;
-  return(data2);
-}
-//==============================================================================
-word* ResizeAlloc(word *data,unsigned ndata,unsigned newsize){
-  word* data2=new word[newsize];
-  ndata=std::min(ndata,newsize);
-  if(ndata)memcpy(data2,data,sizeof(word)*ndata);
   delete[] data;
   return(data2);
 }
@@ -731,42 +559,10 @@ unsigned* ResizeAlloc(unsigned *data,unsigned ndata,unsigned newsize){
   return(data2);
 }
 //==============================================================================
-tuint3* ResizeAlloc(tuint3 *data,unsigned ndata,unsigned newsize){
-  tuint3* data2=new tuint3[newsize];
-  ndata=std::min(ndata,newsize);
-  if(ndata)memcpy(data2,data,sizeof(tuint3)*ndata);
-  delete[] data;
-  return(data2);
-}
-//==============================================================================
-int* ResizeAlloc(int *data,unsigned ndata,unsigned newsize){
-  int* data2=new int[newsize];
-  ndata=std::min(ndata,newsize);
-  if(ndata)memcpy(data2,data,sizeof(unsigned)*ndata);
-  delete[] data;
-  return(data2);
-}
-//==============================================================================
-tint3* ResizeAlloc(tint3 *data,unsigned ndata,unsigned newsize){
-  tint3* data2=new tint3[newsize];
-  ndata=std::min(ndata,newsize);
-  if(ndata)memcpy(data2,data,sizeof(tuint3)*ndata);
-  delete[] data;
-  return(data2);
-}
-//==============================================================================
 float* ResizeAlloc(float *data,unsigned ndata,unsigned newsize){
   float* data2=new float[newsize];
   ndata=std::min(ndata,newsize);
   if(ndata)memcpy(data2,data,sizeof(float)*ndata);
-  delete[] data;
-  return(data2);
-}
-//==============================================================================
-tfloat2* ResizeAlloc(tfloat2 *data,unsigned ndata,unsigned newsize){
-  tfloat2* data2=new tfloat2[newsize];
-  ndata=std::min(ndata,newsize);
-  if(ndata)memcpy(data2,data,sizeof(tfloat2)*ndata);
   delete[] data;
   return(data2);
 }
@@ -779,26 +575,10 @@ tfloat3* ResizeAlloc(tfloat3 *data,unsigned ndata,unsigned newsize){
   return(data2);
 }
 //==============================================================================
-tfloat4* ResizeAlloc(tfloat4 *data,unsigned ndata,unsigned newsize){
-  tfloat4* data2=new tfloat4[newsize];
-  ndata=std::min(ndata,newsize);
-  if(ndata)memcpy(data2,data,sizeof(tfloat4)*ndata);
-  delete[] data;
-  return(data2);
-}
-//==============================================================================
 double* ResizeAlloc(double *data,unsigned ndata,unsigned newsize){
   double* data2=new double[newsize];
   ndata=std::min(ndata,newsize);
   if(ndata)memcpy(data2,data,sizeof(double)*ndata);
-  delete[] data;
-  return(data2);
-}
-//==============================================================================
-tdouble2* ResizeAlloc(tdouble2 *data,unsigned ndata,unsigned newsize){
-  tdouble2* data2=new tdouble2[newsize];
-  ndata=std::min(ndata,newsize);
-  if(ndata)memcpy(data2,data,sizeof(tdouble2)*ndata);
   delete[] data;
   return(data2);
 }
@@ -812,39 +592,8 @@ tdouble3* ResizeAlloc(tdouble3 *data,unsigned ndata,unsigned newsize){
 }
 
 
-//==============================================================================
-/// Returns if float value is + or - infinity.
-//==============================================================================
-bool IsInfinity(float v){
- return(std::numeric_limits<float>::has_infinity && (v==std::numeric_limits<float>::infinity() || v==-std::numeric_limits<float>::infinity()));
- //return(v > FLT_MAX || v < -FLT_MAX); //-Otra opcion mas sencilla.
-}
-
-//==============================================================================
-/// Returns if double value is + or - infinity.
-//==============================================================================
-bool IsInfinity(double v){
- return(std::numeric_limits<float>::has_infinity && (v==std::numeric_limits<float>::infinity() || v==-std::numeric_limits<float>::infinity()));
- //return(v > DBL_MAX || v < -DBL_MAX); //-Otra opcion mas sencilla.
-}
-
-//==============================================================================
-/// Returns if float value is + or - infinity.
-//==============================================================================
-bool IsNAN(float v){
- return(v!=v);
-}
-
-//==============================================================================
-/// Returns if double value is + or - infinity.
-//==============================================================================
-bool IsNAN(double v){
- return(v!=v);
-}
 
 }
-
-
 
 
 

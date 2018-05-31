@@ -15,6 +15,35 @@
  You should have received a copy of the GNU General Public License, along with DualSPHysics. If not, see <http://www.gnu.org/licenses/>. 
 */
 
+//NO_COMENTARIO
+//#############################################################################
+//# ES:
+//# Descripcion:
+//# =============
+//# Clase para la grabacion de particulas excluidas en ficheros PartOut_XXX.obi4
+//# Algunas de sus funcionalidades son:
+//# - Graba particulas excluidas acumulandolas en un fichero PartOut por proceso.
+//# - En cada fichero graba entorno a un maximo de 2.5M de particulas, si hay
+//#   mas particulas excluidas estan se graban en sucesivos ficheros (blocks).
+//#
+//# Cambios:
+//# =========
+//# - Implementacion. (23/11/2013 <-> 23/11/2013)
+//#
+//# EN:
+//# Description: 
+//# ============= 
+//# Class for the recording of excluded particles in files partout XXX.obi4 
+//# Some of its features are: 
+//# - It records excluded particles and accumulates them in PartOut file.
+//# - In each file i set to record a maximum of 2.5 m particles, 
+//#   if there are more particles excluded, they are recorded in 
+//#   successive files (blocks).
+//# 
+//# Changes: 
+//# ========= 
+//# - Implementation. (23/11/2013 &lt; -&gt; 23/11/ 2013)
+//#############################################################################
 
 /// \file JPartOutBi4Save.h \brief Declares the class \ref JPartOutBi4Save.
 
