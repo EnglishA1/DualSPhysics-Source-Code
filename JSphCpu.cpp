@@ -1656,7 +1656,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   #endif*/
 
 	// Partial Slip Calculations
-									float b=0.01f; // SLIP LENGTH
+									float b=0.0f; // SLIP LENGTH
 									for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
 									{
 											float SlipVelx=0, SlipVely=0, SlipVelz=0;
@@ -2514,7 +2514,7 @@ void JSphCpu::UpdatePos(tdouble3 rpos,double movx,double movy,double movz
 {
   //-Check validity of displacement / Comprueba validez del desplazamiento.
   bool outmove=(fabs(float(movx))>MovLimit || fabs(float(movy))>MovLimit || fabs(float(movz))>MovLimit);
-  //-Aplica desplazamiento.
+  //-Aplica desplazamiento / Apply displacement.
   //rpos.x+=movx; rpos.y+=movy; rpos.z+=movz; // removed for fixed particles 
   //-Check limits of real domain / Comprueba limites del dominio reales.
   double dx=rpos.x-MapRealPosMin.x;
