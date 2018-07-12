@@ -740,9 +740,9 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   for(int th=0;th<OmpThreads;th++)viscth[th*STRIDE_OMP]=0;
   //-Inicia ejecucion con OpenMP.
   const int pfin=int(pinit+n);
-  #ifdef _WITHOMP
+  /*#ifdef _WITHOMP
     #pragma omp parallel for schedule (guided)
-  #endif
+  #endif*/
   for(int p1=int(pinit);p1<pfin;p1++){
     float visc=0,arp1=0;
 
@@ -762,6 +762,11 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
         int ymod=zmod+nc.x*y;
         const unsigned pini=beginendcell[cxini+ymod];
         const unsigned pfin=beginendcell[cxfin+ymod];
+
+				/*if(Idpc[p1]==56) cout << "InterBound Loop" << endl << Idpc[p1] << "\t" << velrhop[p1].x << endl;
+				if(Idpc[p1]==68) cout << Idpc[p1] << "\t" << velrhop[p1].x << endl;
+				if(Idpc[p1]==80) cout << Idpc[p1] << "\t" << velrhop[p1].x << endl;
+				if(Idpc[p1]==92) cout << Idpc[p1] << "\t" << velrhop[p1].x << endl;*/
 
         //-Interaction of boundary with type Fluid/Float / Interaccion de Bound con varias Fluid/Float.
         //----------------------------------------------
@@ -1903,7 +1908,7 @@ void JSphCpu::RunMotion(double stepdt){
         unsigned ref;
         tdouble3 mvsimple;
         tmatrix4d mvmatrix;
-        if(Motion->GetMov(c,ref,mvsimple,mvmatrix)){//-Single movement / Movimiento simple
+				if(Motion->GetMov(c,ref,mvsimple,mvmatrix)){//-Single movement / Movimiento simple
           const unsigned pini=MotionObjBegin[ref]-CaseNfixed,np=MotionObjBegin[ref+1]-MotionObjBegin[ref];
           mvsimple=OrderCode(mvsimple);
           if(Simulate2D)mvsimple.y=0;
