@@ -2169,11 +2169,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
   const unsigned cellfluid=nc.w*nc.z+1;
   const int hdiv=(CellMode==CELLMODE_H? 2: 1);
   
-	// Changed the order of interaction and the particles it sums over to npb rather than npbok
-	if(npb){
-    //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
-    InteractionForcesBound      <psimple,tker,ftmode> (npb,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar);
-  }
+	
 
   if(npf){
     //-Interaction Fluid-Fluid / Interaccion Fluid-Fluid
@@ -2188,6 +2184,11 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
     if(lamsps)ComputeSpsTau(npf,npb,velrhop,spsgradvel,spstau);
   }
   
+	// Changed the order of interaction and the particles it sums over to npb rather than npbok
+	if(npb){
+    //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
+    InteractionForcesBound      <psimple,tker,ftmode> (npb,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar);
+  }
 }
 
 //==============================================================================
@@ -2515,7 +2516,7 @@ void JSphCpu::UpdatePos(tdouble3 rpos,double movx,double movy,double movz
   //-Check validity of displacement / Comprueba validez del desplazamiento.
   bool outmove=(fabs(float(movx))>MovLimit || fabs(float(movy))>MovLimit || fabs(float(movz))>MovLimit);
   //-Aplica desplazamiento / Apply displacement.
-  //rpos.x+=movx; rpos.y+=movy; rpos.z+=movz; // removed for fixed particles 
+  rpos.x+=movx; rpos.y+=movy; rpos.z+=movz; // removed for fixed particles 
   //-Check limits of real domain / Comprueba limites del dominio reales.
   double dx=rpos.x-MapRealPosMin.x;
   double dy=rpos.y-MapRealPosMin.y;
@@ -2540,7 +2541,7 @@ void JSphCpu::UpdatePos(tdouble3 rpos,double movx,double movy,double movz
     bool outy=!yperi && (dy<0 || dy>=MapRealSize.y);
     bool outz=!zperi && (dz<0 || dz>=MapRealSize.z);
     out=(outx||outy||outz);
-    //rpos=TDouble3(dx,dy,dz)+MapRealPosMin;  // removed for fixed particles hopefully
+    rpos=TDouble3(dx,dy,dz)+MapRealPosMin;  // removed for fixed particles hopefully
   }
   //-Keep currnt position / Guarda posicion actualizada.
   pos[p]=rpos;
@@ -2871,7 +2872,7 @@ void JSphCpu::MoveLinBound(unsigned np,unsigned ini,const tdouble3 &mvpos,const 
     const unsigned pid=RidpMove[id];
     if(pid!=UINT_MAX){
       UpdatePos(pos[pid],mvpos.x,mvpos.y,mvpos.z,false,pid,pos,dcell,code);
-      velrhop[pid].x=mvvel.x;  velrhop[pid].y=mvvel.y;  velrhop[pid].z=mvvel.z;
+      velrhop[pid].x+=2*mvvel.x;  velrhop[pid].y+=2*mvvel.y;  velrhop[pid].z+=2*mvvel.z;
     }
   }
 }
