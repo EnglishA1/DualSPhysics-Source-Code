@@ -504,15 +504,13 @@ void JSphCpuSingle::GetInteractionCells(unsigned rcell
 /// Interaction to calculate forces.
 //==============================================================================
 void JSphCpuSingle::Interaction_Forces(TpInter tinter){
-  const char met[]="Interaction_Forces";
+  const char met[]="Interaction_Forces"; // added stepdt and partial slip value zeroing     SHABA
   PreInteraction_Forces(tinter);
   TmcStart(Timers,TMC_CfForces);
 
 	
 		// zeroing the partial slip velocity       SHABA
 		memset(SlipVel,0,sizeof(tfloat3)*Npb);
-		
-	
 
   //-Interaction of Fluid-Fluid/Bound & Bound-Fluid (forces and DEM) / Interaccion Fluid-Fluid/Bound & Bound-Fluid (forces and DEM).
   float viscdt=0;
@@ -608,6 +606,7 @@ double JSphCpuSingle::ComputeAceMaxOmp(const bool checkcodenormal,unsigned np,co
 /// calculated in the interaction using Verlet.
 //==============================================================================
 double JSphCpuSingle::ComputeStep_Ver(){
+	
   Interaction_Forces(INTER_Forces);    //-Interaction / Interaccion
   const double dt=DtVariable(true);    //-Calculate new dt / Calcula nuevo dt
   DemDtForce=dt;                       //(DEM)

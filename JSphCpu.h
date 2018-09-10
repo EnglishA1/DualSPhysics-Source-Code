@@ -62,6 +62,7 @@ protected:
 
   //-Particle Position according to id / Posicion de particula segun id.
   unsigned *RidpMove; ///<Only for moving boundary particles [CaseNmoving] and when CaseNmoving!=0 / Solo para boundary moving particles [CaseNmoving] y cuando CaseNmoving!=0 
+	tfloat3 *MoveVel; /// Velocity of moving boundary particles, set to zero when CaseNmoving==0     SHABA
 
   //-List of particle arrays on CPU / Lista de arrays en Cpu para particulas.
   JArraysCpu* ArraysCpu;
@@ -219,7 +220,7 @@ protected:
 
 	void MLSElements4(float a11, float a12, float a13, float a14, float a22, float a23, float a24, float a33, float a34, float a44, float &b11, float &b21, float &b31, float &b41)const;
 
-	void InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velrhop, unsigned *idp, 
+	void InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velrhop, float &velmarx, float &velmary, float &velmarz, unsigned *idp, 
 	float *press, const word *code
 	)const;
 
@@ -229,7 +230,7 @@ protected:
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellinitial
     ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
     ,tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhopp,const word *code, unsigned *id
-    ,float *press,float &viscdt,float *ar)const;
+    ,float *press)const; // changed a few of the paramteres to not be constant     SHABA
 
   template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelta,bool shift> void InteractionForcesFluid
     (unsigned n,unsigned pini,tint4 nc,int hdiv,unsigned cellfluid,float visco
@@ -238,7 +239,7 @@ protected:
     ,const tdouble3 *pos,const tfloat3 *pspos, tfloat4 *velrhop,const word *code,const unsigned *idp
     , float *press
     ,float &viscdt,float *ar,tfloat3 *ace,float *delta
-    ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const;
+    ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const; //changed a few of the parameters to not be constant      SHABA
 
   template<bool psimple> void InteractionForcesDEM
     (unsigned nfloat,tint4 nc,int hdiv,unsigned cellfluid
@@ -254,7 +255,7 @@ protected:
     ,float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
-    ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const;
+    ,TpShifting tshifting,tfloat3 *shiftpos,float *shiftdetect)const; //  changed a few of the parameters to not be constant   SHABA
 
   void Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
@@ -262,7 +263,7 @@ protected:
     ,float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
-    ,tfloat3 *shiftpos,float *shiftdetect)const;
+    ,tfloat3 *shiftpos,float *shiftdetect)const; 
 
   void InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
     ,tuint3 ncells,const unsigned *begincell,tuint3 cellmin,const unsigned *dcell
@@ -270,7 +271,7 @@ protected:
     ,float *press
     ,float &viscdt,float* ar,tfloat3 *ace,float *delta
     ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
-    ,tfloat3 *shiftpos,float *shiftdetect)const;
+    ,tfloat3 *shiftpos,float *shiftdetect)const; 
 
 
   void ComputeSpsTau(unsigned n,unsigned pini,const tfloat4 *velrhop,const tsymatrix3f *gradvel,tsymatrix3f *tau)const;
@@ -292,6 +293,9 @@ protected:
   void MoveLinBound(unsigned np,unsigned ini,const tdouble3 &mvpos,const tfloat3 &mvvel,const unsigned *ridp,tdouble3 *pos,unsigned *dcell,tfloat4 *velrhop,word *code)const;
   void MoveMatBound(unsigned np,unsigned ini,tmatrix4d m,double dt,const unsigned *ridpmv,tdouble3 *pos,unsigned *dcell,tfloat4 *velrhop,word *code)const;
   void RunMotion(double stepdt);
+	void MotionVel(double stepdt, float &VelBoundx, float &VelBoundy, float &VelBoundz, unsigned p)const; // SHABA new boundary velocity function
+	void BoundVelLin(tfloat3 mvvel,float &VelBoundx, float &VelBoundy, float &VelBoundz,word *code, unsigned p)const; // SHABA
+  void BoundVelMat(tmatrix4d m,double dt,const unsigned *ridpmv,tdouble3 *pos,float &VelBoundx, float &VelBoundy, float &VelBoundz,word *code, unsigned p)const; // SHABA
 
   void ShowTimers(bool onlyfile=false);
   void GetTimersInfo(std::string &hinfo,std::string &dinfo)const;

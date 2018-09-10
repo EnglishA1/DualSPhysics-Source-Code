@@ -80,6 +80,7 @@ void JSphCpu::InitVars(){
 	SlipVel = NULL;   //-Partial Slip    SHABA
 	SlipVelOld = NULL;  //- Old Partial Slip velocity      SHABA
 	MarroneVel = NULL; //- Marrone particle velocity       SHABA
+	MoveVel = NULL; // - velocity of a moving boundary     SHABA
 
   Idpc=NULL; Codec=NULL; Dcellc=NULL; Posc=NULL; Velrhopc=NULL;
   VelrhopM1c=NULL;                //-Verlet
@@ -105,6 +106,7 @@ void JSphCpu::FreeCpuMemoryFixed(){
 	delete[] SlipVel;   SlipVel=NULL;  // Partial Slip    SHABA
 	delete[] SlipVelOld; SlipVelOld=NULL; // Old Partial Slip SHABA
 	delete[] MarroneVel; MarroneVel=NULL;
+	delete[] MoveVel; MoveVel=NULL; // Moving boundary velocity SHABA
 
   delete[] RidpMove;  RidpMove=NULL;
   delete[] FtRidp;    FtRidp=NULL;
@@ -119,6 +121,7 @@ void JSphCpu::AllocCpuMemoryFixed(){
 	SlipVel=new tfloat3[Npb]; MemCpuFixed+=(sizeof(tfloat3)*Npb);    // Partial Slip     SHABA
 	SlipVelOld = new tfloat3[Npb]; MemCpuFixed+=(sizeof(tfloat3)*Npb);   // Old partial slip velocity   SHABA
 	MarroneVel = new tfloat3[Npb]; MemCpuFixed+=(sizeof(tfloat3)*Npb);   // Marrone particle velocity   SHABA
+	MoveVel = new tfloat3[Npb]; MemCpuFixed+=(sizeof(tfloat3)*Npb);   // Moving boundary velocity    SHABA
 
   try{
     //-Allocates memory for moving objects.
@@ -425,6 +428,7 @@ void JSphCpu::InitRun(){
 	memset(SlipVelOld,0,sizeof(tfloat3)*Npb);
 	memset(SlipVel,0,sizeof(tfloat3)*Npb);
 	memset(MarroneVel,0,sizeof(tfloat3)*Npb);
+	memset(MoveVel,0,sizeof(tfloat3)*Npb);     // Moving boundary velocity
 	
   //-Adjust paramaters to start.
   PartIni=PartBeginFirst;
@@ -1046,12 +1050,13 @@ void JSphCpu::MLSElements3(float a11, float a12, float a13, float a14, float a22
 // Calculates the velocity and pressure at the Marrone probe particles to be fed
 // back into the boundary particles at a later time
 //==============================================================================
-void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velrhop,unsigned *idp, 
+void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velrhop, float &velmarx, float &velmary, float &velmarz, unsigned *idp, 
 	float *press, const word *code
 	)const
 {
 		//-Load data of particle p1
-    const tdouble3 posp1=pos[p1];
+	
+		const tdouble3 posp1=pos[p1];
 		tdouble3 posMar; 
 		MarroneDuplicatePos(p1, pos, idp, posMar);
 		float umar=0, vmar=0, wmar=0, pmar=0;
@@ -1134,9 +1139,9 @@ void JSphCpu::InteractionForcesMarrone(unsigned p1, tdouble3 *pos, tfloat4 *velr
 		}*/
 
 		// giving the velocities to the boundary particles
-		velrhop[p1].x=-umar;
-		velrhop[p1].y=-vmar;
-		velrhop[p1].z=-wmar;
+		velmarx=umar;
+		velmary=vmar;
+		velmarz=wmar;
 		// giving the pressure to the boundary particles
 		press[p1]=pmar;
 		velrhop[p1].w = pow((press[p1]/CteB)+1,1/Gamma)*RhopZero;
@@ -1179,9 +1184,9 @@ void JSphCpu::PSNormalHunter(unsigned p1, const tdouble3 *pos, const unsigned *i
 
 
 	// using the negative differances to have the normal pointing into the fluid
-	nx=SignHunter(xd);
-	ny=SignHunter(yd);
-	nz=SignHunter(zd);
+	nx=float(SignHunter(xd));
+	ny=float(SignHunter(yd));
+	nz=float(SignHunter(zd));
 
 	float Norm = sqrt(nx*nx + ny*ny + nz*nz);
 	nx = nx/Norm;
@@ -1646,7 +1651,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   (unsigned n,unsigned pinit,tint4 nc,int hdiv,unsigned cellinitial
   ,const unsigned *beginendcell,tint3 cellzero,const unsigned *dcell
   ,tdouble3 *pos,const tfloat3 *pspos,tfloat4 *velrhop,const word *code, unsigned *idp
-  ,float *press,float &viscdt,float *ar)const
+  ,float *press)const
 {
 	//-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
   //float viscth[MAXTHREADS_OMP*STRIDE_OMP];
@@ -1656,7 +1661,8 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
   #endif*/
 
 	// Partial Slip Calculations
-									float b=0.0f; // SLIP LENGTH
+
+	float b=0.0f; // SLIP LENGTH  Origonal Code with out Moving boundaries
 									for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
 									{
 											float SlipVelx=0, SlipVely=0, SlipVelz=0;
@@ -1710,6 +1716,67 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode> void JSphCpu::InteractionFo
 											// This loop gives the periodic boundary particle the correct velocity according to the Marrone+PS velocity
 										}
 									}
+									/*float b=0.0f; // SLIP LENGTH
+									for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
+									{
+											float SlipVelx=0, SlipVely=0, SlipVelz=0;
+											PartialSlipCalc(p1, SlipVelx, SlipVely, SlipVelz, pos, velrhop, idp,b, nc, hdiv, cellinitial, beginendcell, cellzero, dcell);
+											//  This loop calculates the partial slip velocities
+		
+									}
+									
+									double TIMESTEP = 0.00001;
+
+									// Marrone Particle calculations  SHABA
+									for( unsigned p1=0;p1<Npb;p1++) // finding the boundary particles and calculating the partial slip velocity
+									{
+											float velmarx=0, velmary=0, velmarz=0;
+											InteractionForcesMarrone(p1, pos, velrhop, velmarx, velmary, velmarz, idp, press, code); 
+											// This loop calculates the velocity for the marrone boundary particles and gives the boundary particles this velocity
+											
+											 
+											// MotionVel(TIMESTEP,VelBoundx,VelBoundy,VelBoundz,p1);
+
+													velrhop[p1].x = 2*MoveVel[p1].x + 2*SlipVel[p1].x - velmarx;
+													velrhop[p1].y = 2*MoveVel[p1].y + 2*SlipVel[p1].y - velmary;
+													velrhop[p1].z = 2*MoveVel[p1].z + 2*SlipVel[p1].z - velmarz;
+													//   This loop adds the partial slip contribution to the boundary particle in the same way as a wall velocity
+													
+													// loops for finding the shear stress at the boundary. in post processing divide by b and multiply by mu
+													if(pos[p1].z>=0.8)
+													{
+														velrhop[p1].x = SlipVel[p1].x;
+														velrhop[p1].y = 0.0;
+														velrhop[p1].z = 0.0;
+													}
+
+													if(pos[p1].z<=-0.8)
+													{
+														velrhop[p1].x = SlipVel[p1].x;
+														velrhop[p1].y = 0.0;
+														velrhop[p1].z = 0.0;
+													}
+
+											
+									}
+									cout << "68 Bound loop" << velrhop[79].x << " Location " << pos[79].z << "  " << pos[79].x << endl;
+									
+	
+									//periodic particle loop
+									for(unsigned p1=0;p1<Npb;p1++)
+									{
+										bool PerryCox = false;
+										PerryCox = (CODE_GetTypeValue(code[p1])==CODE_PERIODIC);
+										if(PerryCox)
+										{
+											unsigned PartID = idp[p1];
+											unsigned p2 = Bouncer(PartID, code, idp);
+											velrhop[p1].x = velrhop[p2].x;
+											velrhop[p1].y = velrhop[p2].y;
+											velrhop[p1].z = velrhop[p2].z;
+											// This loop gives the periodic boundary particle the correct velocity according to the Marrone+PS velocity
+										}
+									}*/
 	
 /*
   //-Initialize viscth to calculate max viscdt with OpenMP / Inicializa viscth para calcular visdt maximo con OpenMP.
@@ -2187,7 +2254,7 @@ template<bool psimple,TpKernel tker,TpFtMode ftmode,bool lamsps,TpDeltaSph tdelt
 	// Changed the order of interaction and the particles it sums over to npb rather than npbok
 	if(npb){
     //-Interaction of type Bound-Fluid / Interaccion Bound-Fluid
-    InteractionForcesBound      <psimple,tker,ftmode> (npb,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar);
+    InteractionForcesBound      <psimple,tker,ftmode> (npb,0,nc,hdiv,cellfluid,begincell,cellzero,dcell,pos,pspos,velrhop,code,idp,press);
   }
 }
 
@@ -2201,7 +2268,7 @@ void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
   ,float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
-  ,tfloat3 *shiftpos,float *shiftdetect)const
+  ,tfloat3 *shiftpos,float *shiftdetect)const // added stepdt and changed a few of the parameters to not be constant      SHABA
 {
   tfloat3 *pspos=NULL;
   const bool psimple=false;
@@ -2303,7 +2370,7 @@ void JSphCpu::Interaction_Forces(unsigned np,unsigned npb,unsigned npbok
           if(TDeltaSph==DELTA_Dynamic)   Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_Dynamic,tshift>    (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
           if(TDeltaSph==DELTA_DynamicExt)Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_DynamicExt,tshift> (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
         }else{                           const bool lamsps=false;
-          if(TDeltaSph==DELTA_None)      Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_None,tshift>       (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
+					if(TDeltaSph==DELTA_None)      Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_None,tshift>       (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
           if(TDeltaSph==DELTA_Dynamic)   Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_Dynamic,tshift>    (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
           if(TDeltaSph==DELTA_DynamicExt)Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_DynamicExt,tshift> (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
         }
@@ -2354,7 +2421,7 @@ void JSphCpu::InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
   ,float *press
   ,float &viscdt,float* ar,tfloat3 *ace,float *delta
   ,tsymatrix3f *spstau,tsymatrix3f *spsgradvel
-  ,tfloat3 *shiftpos,float *shiftdetect)const
+  ,tfloat3 *shiftpos,float *shiftdetect)const // added stepdt and changed a few of the parameters to not be constant      SHABA
 {
   tdouble3 *pos=NULL;
   const bool psimple=true;
@@ -2434,7 +2501,7 @@ void JSphCpu::InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
           if(TDeltaSph==DELTA_Dynamic)   Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_Dynamic,tshift>    (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
           if(TDeltaSph==DELTA_DynamicExt)Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_DynamicExt,tshift> (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
         }else{                           const bool lamsps=false;
-          if(TDeltaSph==DELTA_None)      Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_None,tshift>       (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
+					if(TDeltaSph==DELTA_None)      Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_None,tshift>       (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
           if(TDeltaSph==DELTA_Dynamic)   Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_Dynamic,tshift>    (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
           if(TDeltaSph==DELTA_DynamicExt)Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_DynamicExt,tshift> (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
         }
@@ -2444,7 +2511,7 @@ void JSphCpu::InteractionSimple_Forces(unsigned np,unsigned npb,unsigned npbok
           if(TDeltaSph==DELTA_Dynamic)   Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_Dynamic,tshift>    (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
           if(TDeltaSph==DELTA_DynamicExt)Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_DynamicExt,tshift> (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
         }else{                           const bool lamsps=false;
-          if(TDeltaSph==DELTA_None)      Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_None,tshift>       (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
+					if(TDeltaSph==DELTA_None)      Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_None,tshift>       (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
           if(TDeltaSph==DELTA_Dynamic)   Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_Dynamic,tshift>    (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
           if(TDeltaSph==DELTA_DynamicExt)Interaction_ForcesT<psimple,tker,ftmode,lamsps,DELTA_DynamicExt,tshift> (np,npb,npbok,ncells,begincell,cellmin,dcell,pos,pspos,velrhop,code,idp,press,viscdt,ar,ace,delta,spstau,spsgradvel,TShifting,shiftpos,shiftdetect);
         }
@@ -2872,9 +2939,11 @@ void JSphCpu::MoveLinBound(unsigned np,unsigned ini,const tdouble3 &mvpos,const 
     const unsigned pid=RidpMove[id];
     if(pid!=UINT_MAX){
       UpdatePos(pos[pid],mvpos.x,mvpos.y,mvpos.z,false,pid,pos,dcell,code);
-      velrhop[pid].x+=2*mvvel.x;  velrhop[pid].y+=2*mvvel.y;  velrhop[pid].z+=2*mvvel.z;
+      velrhop[pid].x=mvvel.x;  velrhop[pid].y=mvvel.y;  velrhop[pid].z=mvvel.z;
+			MoveVel[pid].x = mvvel.x; MoveVel[pid].y = mvvel.y; MoveVel[pid].z = mvvel.z;
     }
   }
+	//cout << "68 MoveLinBound  " << velrhop[79].x << "   " << mvvel.x <<endl;
 }
 
 //==============================================================================
@@ -2894,6 +2963,7 @@ void JSphCpu::MoveMatBound(unsigned np,unsigned ini,tmatrix4d m,double dt
       const double dx=ps2.x-ps.x, dy=ps2.y-ps.y, dz=ps2.z-ps.z;
       UpdatePos(ps,dx,dy,dz,false,pid,pos,dcell,code);
       velrhop[pid].x=float(dx/dt);  velrhop[pid].y=float(dy/dt);  velrhop[pid].z=float(dz/dt);
+			MoveVel[pid].x = float(dx/dt); MoveVel[pid].y = float(dy/dt); MoveVel[pid].z = float(dz/dt);
     }
   }
 }
@@ -2932,6 +3002,7 @@ void JSphCpu::RunMotion(double stepdt){
       BoundChanged=true;
     }
   }
+	//cout << "68 RunMotion  " << Velrhopc[79].x <<endl;
   //-Process other modes of motion / Procesa otros modos de motion.
   if(WaveGen){
     if(!nmove)CalcRidp(PeriActive!=0,Npb,0,CaseNfixed,CaseNfixed+CaseNmoving,Codec,Idpc,RidpMove);
@@ -2955,6 +3026,70 @@ void JSphCpu::RunMotion(double stepdt){
     }
   }
   TmcStop(Timers,TMC_SuMotion);
+}
+
+//==============================================================================
+// Funcition to find the velocity of a moving boundary particle with velocity 
+// given by a linear movement to be used in InteractionForcesBound
+//==============================================================================
+void JSphCpu::BoundVelLin(tfloat3 mvvel,float &VelBoundx, float &VelBoundy, float &VelBoundz,word *code, unsigned p)const
+{
+  unsigned pid=RidpMove[p];
+  if(CODE_GetType(code[pid]) == CODE_TYPE_MOVING){
+    //UpdatePos(pos[pid],mvpos.x,mvpos.y,mvpos.z,false,pid,pos,dcell,code); // removed so that the particles don't move in space
+    VelBoundx=mvvel.x;  VelBoundy=mvvel.y;  VelBoundz=mvvel.z;
+  }
+	//cout << "68 MoveLinBound  " << Velrhopc[79].x << "   " << mvvel.x <<endl;
+}
+
+//==============================================================================
+// Funcition to find the velocity of a moving boundary particle with velocity 
+// given by a matrix to be used in InteractionForcesBound
+//==============================================================================
+void JSphCpu::BoundVelMat(tmatrix4d m,double dt,const unsigned *ridpmv,tdouble3 *pos,float &VelBoundx, float &VelBoundy, float &VelBoundz,word *code, unsigned p)const
+{
+  unsigned pid=RidpMove[p];
+  if(CODE_GetType(code[pid]) == CODE_TYPE_MOVING){
+    tdouble3 ps=pos[pid];
+    tdouble3 ps2=MatrixMulPoint(m,ps);
+    if(Simulate2D)ps2.y=ps.y;
+    const double dx=ps2.x-ps.x, dy=ps2.y-ps.y, dz=ps2.z-ps.z;
+    //UpdatePos(ps,dx,dy,dz,false,pid,pos,dcell,code); //removed so the particles don't move in space
+    VelBoundx=float(dx/dt);  VelBoundy=float(dy/dt);  VelBoundz=float(dz/dt);
+  }
+}
+
+//===================================================================================                                    SHABA
+// function to find the velocity of a moving boundary without applying the displacement
+// this found velocity will be used in InteractionForcesBound to allow for moving boundaries
+//
+//===================================================================================
+void JSphCpu::MotionVel(double stepdt, float &VelBoundx, float &VelBoundy, float &VelBoundz, unsigned p)const 
+{
+	unsigned nmove=0;
+    nmove=Motion->GetMovCount();
+    if(nmove){
+      CalcRidp(PeriActive!=0,Npb,0,CaseNfixed,CaseNfixed+CaseNmoving,Codec,Idpc,RidpMove);
+      //-Movement of  boundary particles / Movimiento de particulas boundary
+      for(unsigned c=0;c<nmove;c++){
+        unsigned ref;
+        tdouble3 mvsimple;
+        tmatrix4d mvmatrix;
+        if(Motion->GetMov(c,ref,mvsimple,mvmatrix)){//-Single movement / Movimiento simple
+          const unsigned pini=MotionObjBegin[ref]-CaseNfixed,np=MotionObjBegin[ref+1]-MotionObjBegin[ref];
+          mvsimple=OrderCode(mvsimple);
+          if(Simulate2D)mvsimple.y=0;
+          const tfloat3 mvvel=ToTFloat3(mvsimple/TDouble3(stepdt));
+          BoundVelLin(mvvel,VelBoundx,VelBoundy,VelBoundz,Codec,p);
+        }
+        else{//-Movement using a matrix / Movimiento con matriz
+          const unsigned pini=MotionObjBegin[ref]-CaseNfixed,np=MotionObjBegin[ref+1]-MotionObjBegin[ref];
+          mvmatrix=OrderCode(mvmatrix);
+          BoundVelMat(mvmatrix,stepdt,RidpMove,Posc,VelBoundx,VelBoundy,VelBoundz,Codec,p);
+        }
+      }
+    }
+
 }
 
 //==============================================================================
